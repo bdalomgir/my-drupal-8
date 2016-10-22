@@ -1,0 +1,15 @@
+ptn_doors.door_request:
+  path: 'door-request'
+  defaults:
+    _form: 'Drupal\ptn_doors\Form\DoorRequestForm'
+    _title: 'Building and Door Request Form'
+  requirements:
+    _permission: 'access content'
+
+ptn_doors.door_admin_main_form:
+  path: 'admin/ptn_doors/main'
+  defaults:
+    _form: 'Drupal\ptn_doors\Form\DoorsAdminMainForm'
+    _title: 'Building and Door Request Management'
+  requirements:
+    _permission: 'administer users'

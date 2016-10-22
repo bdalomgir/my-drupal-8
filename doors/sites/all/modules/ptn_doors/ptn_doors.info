@@ -1,0 +1,7 @@
+name = "Door Request Utilities"
+package = "PTN Utilities"
+description = Custom code for managing door request forms and workflow
+core = "7.x"
+version = "7.x-1.0"
+project = "ptn_doors"
+files[] = ptn_doors.module

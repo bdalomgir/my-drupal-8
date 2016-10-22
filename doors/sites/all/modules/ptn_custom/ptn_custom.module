@@ -1,0 +1,200 @@
+<?php
+
+function ptn_custom_menu() {
+  $items['admin/config/ptn/homepage'] = array(
+    'title' => 'Home Page config',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_homepage_config'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  
+  $items['admin/content/homepage'] = array(
+    'title' => 'Home Page Edit',
+    'page callback' => 'ptn_homepage',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['admin/content/homepage-banner'] = array(
+    'title' => 'Home Page Banner Edit',
+    'page callback' => 'ptn_homepage_banner',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['admin/content/default-banner'] = array(
+    'title' => 'Change Default Banner',
+    'page callback' => 'ptn_default_banner',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['admin/content/views-banner'] = array(
+    'title' => 'Change Views Banner',
+    'page callback' => 'ptn_general_banner',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  
+  $items['admin/content/views-configuration'] = array(
+    'title' => 'Views Configuration Edit',
+    'page callback' => 'ptn_views_config_edit',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+  );
+    
+  return $items;
+}
+
+function ptn_homepage_banner() {
+  $output ='';
+  $home_page_nid = variable_get('home_page_banner_node', '');
+  if($home_page_nid != '') {
+    drupal_goto('node/' . $home_page_nid . '/edit');
+  }
+  else {
+    $output = t('Home page banner node is not yet configured. ') .  l(t('Enter the Homepage banner nid here.'), 'admin/config/ptn/homepage');
+  }
+  return $output;
+}
+
+function ptn_homepage_config($form, &$form_state) {
+  $form = array();
+  $form['home_page_node'] = array(
+    '#title' => t('Homepage Node nid'),
+    '#type' => 'textfield',
+    '#default_value' => variable_get('home_page_node', ''),
+  );
+  $form['home_page_banner_node'] = array(
+    '#title' => t('Homepage Banner Node nid'),
+    '#type' => 'textfield',
+    '#default_value' => variable_get('home_page_banner_node', ''),
+  );
+  $form['default_banner_node'] = array(
+    '#title' => t('Default Banner Node nid'),
+    '#type' => 'textfield',
+    '#default_value' => variable_get('default_banner_node', ''),
+  );
+  return system_settings_form($form);
+}
+
+function ptn_default_banner() {
+  $output ='';
+  $default_banner_nid = variable_get('default_banner_node', '');
+  if($default_banner_nid != '') {
+    drupal_goto('node/' . $default_banner_nid . '/edit');
+  }
+  else {
+    $output = t('Home page node is not yet configured. ') .  l(t('Enter the Homepage nid here.'), 'admin/config/ptn/homepage');
+  }
+  return $output;
+}
+
+function ptn_general_banner() {
+  drupal_goto('admin/views-banner');
+}
+
+function ptn_homepage() {
+  $output ='';
+  $home_page_nid = variable_get('home_page_node', '');
+  if($home_page_nid != '') {
+    drupal_goto('node/' . $home_page_nid . '/edit');
+  }
+  else {
+    $output = t('Home page node is not yet configured. ') .  l(t('Enter the Homepage nid here.'), 'admin/config/ptn/homepage');
+  }
+  return $output;
+}
+
+function ptn_views_config_edit() {
+  drupal_goto('views-config');
+}
+
+
+function ptn_custom_block_info() {
+  $blocks['banner'] = array(
+    'info' => t('Banner')
+  );
+  return $blocks;
+}
+
+function ptn_custom_block_view($delta = '') {
+  if ($delta == 'banner') {
+    $block['subject'] = "Banner";
+    $block['content'] = _get_page_banner();
+  }
+  return $block;
+}
+
+function _get_page_banner() {
+  $object = menu_get_object();
+  if(isset($object)) {
+    if (isset($object->field_banner_image['und'])) {
+      $banner_uri = $object->field_banner_image['und'][0]['uri'];
+    }
+    else {
+      $nid = variable_get('default_banner_node', '');
+      $banner_node = node_load($nid);
+      $banner_uri = $banner_node->field_banner_image['und'][0]['uri'];
+    }
+  }
+  else {
+    $menu_items = menu_get_item();
+    if (isset($menu_items)) {
+			$view_item = $menu_items['page_arguments'];
+			$views_string = trim($view_item[0]) . '|' . trim($view_item[1]);
+			$result = db_query("SELECT n.nid
+                                            FROM node n
+                                            INNER JOIN field_data_field_related_view c ON n.nid = c.entity_id
+                                            WHERE c.field_related_view_vname =  :view
+                                            AND n.type = :type", array(':view' => $views_string, ':type' => 'views_banner'))->fetchField();
+
+	    $banner_node = node_load($result);
+	    $banner_uri = $banner_node->field_banner_image['und'][0]['uri'];
+	    
+	    if($banner_uri == '') {
+	    	$nid = variable_get('default_banner_node', '');
+		    $banner_node = node_load($nid);
+		    $banner_uri = $banner_node->field_banner_image['und'][0]['uri'];
+	    }
+      //print $banner_uri; die('here');
+    }
+    else {
+	    $nid = variable_get('default_banner_node', '');
+	    $banner_node = node_load($nid);
+	    $banner_uri = $banner_node->field_banner_image['und'][0]['uri'];
+    }
+  }
+  $image = theme('image_style',array(
+    'style_name' => 'slideshow',
+    'path' => $banner_uri,
+    'attributes' => array('style' => '')
+    )
+  );
+  //print '<pre>' . print_r($object, 1) . '</pre>';
+  return '<div class="field-content">' . $image . '</div>';
+}
+
+
+/**
+ * hook_views_query_alter()
+ */ 
+
+function ptn_custom_views_query_alter(&$view, &$query) {
+	//print '<pre>' . print_r($query, 1) . '</pre>';
+	global $user;
+  if($view->name == 'staff_directory') {
+  	if (isset($_GET['sort_by'])) {
+  		if($_GET['sort_by'] == 'field_last_name_value') {
+  		  //if ($_GET['field_staff_category_value'] == '' || $_GET['field_staff_category_value'] == 'All') {
+				if ($_GET['drop_weight'] == yes) {
+  			  //print '<pre>' . print_r($_GET, 1) . '</pre>';
+  				//die();
+  			  unset($query->orderby[0]);
+  		  }
+  		}
+  	}
+  	//if ($user->uid == 1) {
+    //  watchdog('hhhh',  '<pre>' . print_r($query->orderby, 1) . '</pre>');
+      //die();
+  	//}
+  }
+}

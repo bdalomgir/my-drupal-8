@@ -1,0 +1,14 @@
+name = Open Standards Media Player
+description = The Open Standards Media player plugin for the MediaFront module.
+package = "MediaFront : Players"
+dependencies[] = mediafront
+core = 7.x
+files[] = osmplayer.module
+required = FALSE
+
+; Information added by Drupal.org packaging script on 2014-05-04
+version = "7.x-2.2+27-dev"
+core = "7.x"
+project = "mediafront"
+datestamp = "1399244029"
+

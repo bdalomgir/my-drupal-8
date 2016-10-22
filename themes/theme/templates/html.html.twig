@@ -1,0 +1,177 @@
+{#
+/**
+ * @file
+ * Default theme implementation to display the basic html structure of a single
+ * Drupal page.
+ *
+ * Variables:
+ * - $css: An array of CSS files for the current page.
+ * - $language: (object) The language the site is being displayed in.
+ *   $language->language contains its textual representation.
+ *   $language->dir contains the language direction. It will either be 'ltr' or
+ *   'rtl'.
+ * - $rdf_namespaces: All the RDF namespace prefixes used in the HTML document.
+ * - $grddl_profile: A GRDDL profile allowing agents to extract the RDF data.
+ * - $head_title: A modified version of the page title, for use in the TITLE
+ *   tag.
+ * - $head_title_array: (array) An associative array containing the string parts
+ *   that were used to generate the $head_title variable, already prepared to be
+ *   output as TITLE tag. The key/value pairs may contain one or more of the
+ *   following, depending on conditions:
+ *   - title: The title of the current page, if any.
+ *   - name: The name of the site.
+ *   - slogan: The slogan of the site, if any, and if there is no title.
+ * - $head: Markup for the HEAD section (including meta tags, keyword tags, and
+ *   so on).
+ * - $styles: Style tags necessary to import all CSS files for the page.
+ * - $scripts: Script tags necessary to load the JavaScript files and settings
+ *   for the page.
+ * - $page_top: Initial markup from any modules that have altered the
+ *   page. This variable should always be output first, before all other dynamic
+ *   content.
+ * - $page: The rendered page content.
+ * - $page_bottom: Final closing markup from any modules that have altered the
+ *   page. This variable should always be output last, after all other dynamic
+ *   content.
+ * - $classes String of classes that can be used to style contextually through
+ *   CSS.
+ *
+ * @see bootstrap_preprocess_html()
+ * @see template_preprocess()
+ * @see template_preprocess_html()
+ * @see template_process()
+ *
+ * @ingroup templates
+ */
+#}
+{%
+  set body_classes = [
+    logged_in ? 'user-logged-in',
+    not root_path ? 'path-frontpage' : 'path-' ~ root_path|clean_class,
+    node_type ? 'page-node-type-' ~ node_type|clean_class,
+    db_offline ? 'db-offline',
+    theme.settings.navbar_position ? 'navbar-is-' ~ theme.settings.navbar_position,
+  ]
+%}
+
+<!DOCTYPE html>
+<html {{ html_attributes }}>
+  <head>
+    <head-placeholder token="{{ placeholder_token|raw }}">
+    <title>{{ head_title|safe_join(' | ') }}</title>
+    <css-placeholder token="{{ placeholder_token|raw }}">
+    <js-placeholder token="{{ placeholder_token|raw }}">
+  </head>
+  <body{{ attributes.addClass(body_classes) }}>
+  
+	<div id="fb-root"></div>
+	<script>(function(d, s, id) {
+	var js, fjs = d.getElementsByTagName(s)[0];
+	if (d.getElementById(id)) return;
+	js = d.createElement(s); js.id = id;
+	js.src = "//connect.facebook.net/en_US/sdk.js#xfbml=1&version=v2.6&appId=322102227936038";
+	fjs.parentNode.insertBefore(js, fjs);
+	}(document, 'script', 'facebook-jssdk'));
+	</script>
+  
+    <a href="#main-content" class="visually-hidden focusable skip-link">
+      {{ 'Skip to main content'|t }}
+    </a>
+    {{ page_top }}
+	
+	{{ page.alert_minor }}
+    <header class="row">
+    	<div class="row top">
+            <div class="row content">
+        	<div class="logo left"><a class="block" href="http://sdsdev.co/PTN8"><img class="img-block" src="http://sdsdev.co/PTN8/{{ base_path ~ directory }}/images/logo.png"/></a></div>
+                <div class="mobile right"><a></a></div>
+                <div class="options right">
+                    <div class="row nav-small">{{ page.nav_small }}</div>
+                    <div class="row nav-medium">{{ page.nav_medium }}</div>
+                    <!--<div class="row search relative">
+                        <input type="text" placeholder="Search this website">
+                        <button type="submit"><i class="icon-search"></i></button>
+                    </div>-->
+					<div class="row search relative">
+                        {{ search_form_block }} 
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row bottom">
+            <section class="row mobile">
+                <div class="row content">{{ page.nav_mobile }}</div>
+        	</section>
+
+        	<div class="row tabs desktop">
+                <div class="row content">{{ page.ptn_main }}</div>
+            </div>
+
+        	<div class="row tabs mobile">
+                <div class="row content">{{ page.nav_small }}</div>
+            </div>
+        </div>
+    </header>
+
+	{{ page.alert_major }}
+	
+	<main>
+    {{ page }}
+    {{ page_bottom }}
+	</main>
+
+    <footer class="row">
+        <div class="row top">
+        	<div class="row content">
+                <div class="row navigate">
+                    <div class="row a">
+                        <div class="c-4 numbers">
+                            <div class="row box">{{ page.phone_numbers }}</div>
+                        </div>
+                        <div class="c-4 nav">{{ page.footer_1 }}</div>
+                        <div class="c-4 nav">{{ page.footer_2 }}</div>
+                    </div>
+                    <div class="row b">
+                        <div class="c-4 nav">{{ page.footer_3 }}</div>
+                        <div class="c-4 nav">{{ page.footer_4 }}</div>
+                        <div class="c-4 nav">{{ page.footer_5 }}</div>
+                    </div><!-- row.b -->
+                </div><!-- navigate -->
+                <div class="row contact">
+                    <div class="social left">
+                        <div class="row heading"><h4>Stay Connected</h4></div>
+                        <div class="row data">
+                            <ul>
+                            <li><a href="https://www.facebook.com/pudps"><i class="icon-facebook"></i></a></li>
+                            <li><a href="https://publicsafety.princeton.edu/news-feed"><i class="icon-rss"></i></a></li>
+                            </ul>
+                        </div>
+    				</div>
+                    <div class="map left">
+                        <div class="row heading"><h4>Visiting Public Safety</h4></div>
+                        <div class="row data">
+                            <div class="col info">
+                                Department of Public Safety,<br/>
+                                200 Elm Drive, Princeton, NJ 08544
+                            </div>
+                            <div class="col icon"><a class="button grey" href="http://publicsafety.princeton.edu/visitors/visiting-campus"><i class="icon-map-marker"></i></a></div>
+                        </div>
+                    </div>
+                    <div class="feedback right">
+                        <div class="row heading">&nbsp;</div>
+                        <div class="row data"><a class="button grey" href="http://publicsafety.princeton.edu/forms/dps-feedback-form">Send Us Feedback!</a></div>
+                    </div>
+                </div><!-- row.contact -->
+            </div>
+        </div><!-- top -->
+        <div class="row bottom">
+        	<div class="row content">
+            	<div class="col logo"><img class="img-block" src="http://sdsdev.co/PTN8/themes/theme/images/footer_logo.png"/></div>
+                <div class="col mid copy">©2013 The Trustees of <a target="_blank" href="http://www.princeton.edu/main/administration/legal_compliance/copyright/">Princeton University</a> · Princeton, New Jersey 08544 USA, Operator: (609) 258-3000 · <a target="_blank" href="http://princeton.edu">Copyright infringement</a> · <a target="_blank" href="/forms/dps-feedback-form">Website Feedback</a> · Last update: April 27th, 2016</div>
+            </div>
+        </div>
+    </footer>
+    <js-bottom-placeholder token="{{ placeholder_token|raw }}">
+  </body>
+</html>

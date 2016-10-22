@@ -1,0 +1,41 @@
+ptn_doors.door_request:
+  path: 'door-request'
+  defaults:
+    _form: 'Drupal\ptn_doors\Form\DoorRequestForm'
+    _title: 'Building and Door Request Form'
+  requirements:
+    _permission: 'access content'
+
+ptn_doors.door_admin_main_form:
+  path: 'admin/ptn_doors/main'
+  defaults:
+    _form: 'Drupal\ptn_doors\Form\DoorsAdminMainForm'
+    _title: 'Building and Door Request Management'
+  requirements:
+    _permission: 'administer users'
+
+ptn_doors.doors_admin_notifications_form:
+  path: 'admin/ptn_doors/notifications'
+  defaults:
+    _form: 'Drupal\ptn_doors\Form\DoorsAdminNotificationsForm'
+    _title: 'Building and Door Request Management - Notification Settings'
+  requirements:
+    _permission: 'administer users'
+
+ptn_doors.doors_admin_remove_contact_form:
+  path: 'admin/ptn_doors/remove_contact/{contact_type}/{contact_address}'
+  defaults:
+    _form: 'Drupal\ptn_doors\Form\DoorsAdminRemoveContactForm'
+    _title: 'Remove One Contact'
+    contact_type: ''
+    contact_address: ''
+  requirements:
+    _permission: 'administer users'
+
+ptn_doors.doors_admin_import_form:
+  path: 'admin/ptn_doors/import'
+  defaults:
+    _form: 'Drupal\ptn_doors\Form\DoorsAdminImportForm'
+    _title: 'Building and Door Request Management - Import Buildings and Doors'
+  requirements:
+    _permission: 'administer users'

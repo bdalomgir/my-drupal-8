@@ -1,0 +1,1 @@
+window.CKEDITOR_BASEPATH = '/PTN8/doors/sites/all/libraries/ckeditor/';

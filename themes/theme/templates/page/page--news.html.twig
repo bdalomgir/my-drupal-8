@@ -1,0 +1,50 @@
+{# #}
+
+{% if is_front %}
+{% endif %}
+
+<section class="row cover">
+     {{ page.slideshow }}
+</section>
+
+<section class="row nav">
+	<div class="row content">
+        <div class="row nav">
+            <div class="row heading"><h5>Navigate This Section</h5></div>
+			{{ page.sidebar_menu }}
+        </div>
+    </div>
+</section><!-- row.nav -->
+
+{% if page.content %}
+	<section class="row main sidebar">
+		<div class="row content">
+			<div class="col prime">
+				<div class="row box">
+					
+                    {{ title_prefix }}
+                        
+                          <div class="row heading"><h2>News</h2></div>
+                        
+                    {{ title_suffix }}
+
+					<div class="row bread">
+						{{ page.breadcrumb }}
+					</div>
+					<div class="row entry">{{ page.content }}</div>
+				</div>
+			</div>
+			<div class="col aside">
+				<div class="row nav">{{ page.sidebar_menu }}</div>
+				
+				{% if page.popular_posts %}
+					{{ page.popular_posts }}
+				{% endif %}
+				
+				{% if page.facebook_likes %}
+					{{ page.facebook_likes }}
+				{% endif %}
+			</div><!-- col.aside -->
+		</div><!-- row.content -->
+	</section>
+{% endif %}

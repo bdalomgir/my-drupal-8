@@ -1,0 +1,50 @@
+<?php
+ namespace Drupal\ptn_doors\Form;
+
+ use Drupal\Core\Form\FormBase;
+ use Drupal\Core\Form\FormStateInterface;
+
+ class DoorsAdminRemoveContactForm extends FormBase {
+   public $PTNDoors;
+
+   public function __construct(){
+     $this->PTNDoors = new \Drupal\ptn_doors\PTNDoors();
+   }
+
+   public function getFormId() {
+     return 'doors_admin_remove_contact_form';
+   }
+
+   public function buildForm(array $form, FormStateInterface $form_state) {
+
+      // validate
+      if(empty($contact_type) || empty($contact_address)) {
+        drupal_set_message('Missing contact type or address', 'error');
+        return;
+      }
+
+      // read list
+      $contact_address = urldecode($contact_address);
+      $contact_list = $this->PTNDoors->ptn_doors_get_notification_emails($contact_type);
+      if(($key = array_search($contact_address, $contact_list)) !== false) {
+        unset($contact_list[$key]);
+      }
+
+      // set new list
+      $this->PTNDoors->ptn_doors_set_notification_emails($contact_type, $contact_list);
+
+      drupal_set_message('Removed contact: ' . $contact_address);
+      drupal_goto('admin/ptn_doors/notifications');
+   }
+
+   public function validateForm(array &$form, FormStateInterface $form_state) {
+
+   }
+
+   public function submitForm(array &$form, FormStateInterface $form_state) {
+
+   }
+
+
+ }
+?>

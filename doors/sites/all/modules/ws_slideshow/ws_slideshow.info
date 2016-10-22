@@ -1,0 +1,14 @@
+name = WS Slideshow
+description = Node based gallery with WS Slideshow
+dependencies[] = filefield_sources_plupload
+dependencies[] = transliteration
+dependencies[] = libraries
+package = Other
+core = 7.x
+
+; Information added by drupal.org packaging script on 2013-01-03
+version = "7.x-1.0-alpha1"
+core = "7.x"
+project = "ws_slideshow"
+datestamp = "1357208087"
+

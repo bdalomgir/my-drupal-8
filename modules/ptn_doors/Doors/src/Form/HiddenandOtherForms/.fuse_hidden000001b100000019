@@ -1,0 +1,144 @@
+<?php
+ namespace Drupal\ptn_doors\Form;
+
+ use Drupal\Core\Ajax\AjaxResponse;
+ use Drupal\Core\Ajax\ChangedCommand;
+ use Drupal\Core\Ajax\CssCommand;
+ use Drupal\Core\Ajax\HtmlCommand;
+ use Drupal\Core\Ajax\ReplaceCommand;
+ use Drupal\Core\Ajax\InvokeCommand;
+ use Drupal\Core\Form\FormBase;
+ use Drupal\Core\Form\FormStateInterface;
+
+ class DoorsAdminNotificationsForm extends FormBase {
+   public $PTNDoors;
+
+   public function __construct(){
+     $this->PTNDoors = new \Drupal\ptn_doors\PTNDoors();
+   }
+
+   public function getFormId() {
+     return 'doors_admin_notifications_form';
+   }
+
+   public function buildForm(array $form, FormStateInterface $form_state) {
+    // build form
+
+    $form = array();
+
+    $form['utility_links'] = array(
+      '#markup' => $this->PTNDoors->ptn_doors_get_utility_links()
+    );
+
+    // electric contacts
+
+    $form['heading_electric'] = array(
+      '#markup' => '<h2>Contacts for Electric Doors</h2>'
+    );
+
+    $form['electric_contacts'] = array(
+      '#markup' => $this->PTNDoors->ptn_doors_get_notification_contacts('electric')
+    );
+
+    $form['electric_new'] = array(
+      '#type' => 'textfield',
+      '#size' => 25,
+      '#maxlength' => 100,
+      '#default_value' => 'electric@princeton.edu',
+      '#attributes' => array(
+          'onclick' => 'this.value="";'
+       ),
+    );
+
+    $form['electric_add'] = array(
+      '#type' => 'submit',
+      '#value' => t('Add Electric Door Contact'),
+      '#ajax' => array(
+        'callback' => 'Drupal\ptn_doors\Form\DoorsAdminNotificationsForm::adminNotificationFormAJAX',
+        'wrapper' => 'contact-list-electric',
+        'method' => 'replaceWith',
+        'effect' => 'fade',
+      ),
+    );
+
+    // manual contacts
+
+    $form['heading_manual'] = array(
+      '#markup' => '<h2>Contacts for Manual Doors</h2>'
+    );
+
+    $form['manual_contacts'] = array(
+      '#markup' => $this->PTNDoors->ptn_doors_get_notification_contacts('manual')
+    );
+
+    $form['manual_new'] = array(
+      '#type' => 'textfield',
+      '#size' => 25,
+      '#maxlength' => 100,
+      '#default_value' => 'manual@princeton.edu',
+      '#attributes' => array(
+          'onclick' => 'this.value="";'
+       ),
+    );
+
+    $form['manual_add'] = array(
+      '#type' => 'submit',
+      '#value' => t('Add Manual Door Contact'),
+      '#ajax' => array(
+        'callback' => 'Drupal\ptn_doors\Form\DoorsAdminNotificationsForm::adminNotificationFormAJAX',
+        'wrapper' => 'contact-list-manual',
+        'method' => 'replaceWith',
+        'effect' => 'fade',
+      ),
+    );
+
+    // return
+    return $form;
+   }
+
+   public function validateForm(array &$form, FormStateInterface $form_state) {
+
+   }
+
+   public function submitForm(array &$form, FormStateInterface $form_state) {
+
+   }
+
+   public function adminNotificationFormAJAX(array &$form, FormStateInterface $form_state){
+     $ajax_response = new AjaxResponse();
+
+     // validate
+     $wrapper = $form_state->getTriggeringElement();
+     $wrapper = $wrapper['#ajax']['wrapper'];
+     $wrapper_ID = $wrapper;
+     $wrapper = explode('-', $wrapper);
+     $contact_type = $wrapper[2];
+     if(empty($contact_type)){
+       drupal_set_message('Could not read contact type', 'error');
+       return "ERROR";
+     }
+
+     // read new contact
+     $contact_field = ('electric' == $contact_type) ? 'electric_new' : 'manual_new';
+     $new_contact = $form_state->getUserInput();
+     $new_contact = $new_contact[$contact_field];
+     if(empty($new_contact)){
+       drupal_set_message('Could not read new contact email', 'error');
+       return "ERROR";
+     }
+
+     // add to list
+     $var_prefix = 'ptn_doors_contact_';
+     $var_name = $var_prefix . $contact_type;
+     $list = \Drupal::config('ptn_doors.settings')->get($var_name);
+     $new_list = (empty($list)) ? $new_contact : $list . '|' . $new_contact;
+     echo $new_list."1";
+     \Drupal::config()->set($var_name, $new_list)->save();
+
+     $ajax_response->addCommand(new ReplaceCommand('#'+$wrapper_ID, $this->PTNDoors->ptn_doors_get_notification_contacts($contact_type)));
+   }
+
+
+ }
+
+?>

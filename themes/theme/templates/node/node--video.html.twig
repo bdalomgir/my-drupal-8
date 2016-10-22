@@ -1,0 +1,14 @@
+<article class="row">
+<!-- 	<div class="video_wp videoWrapper">
+		{% if(node.get('field_media_url').value) %}
+			 <iframe class="iframe_youtube " src=""> </iframe> 
+			<div class="youtube" src="{{ node.get('field_media_url').value }}"></div>
+		{% endif %}
+	</div> -->
+	{% if(node.get('field_media_url').value) %}
+		<div id="Playvideo" src="{{ node.get('field_media_url').value }}" >Loading the player...</div>
+	{% endif %}
+
+	
+	<div class="row entry">{{ content }}</div>
+</article>

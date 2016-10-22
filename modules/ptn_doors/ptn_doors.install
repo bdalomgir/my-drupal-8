@@ -1,0 +1,94 @@
+<?php
+
+/**
+ * Custom tables for ptn_doors
+ */
+function ptn_doors_schema() {
+  $schema['ptn_buildings'] = array(
+    'description' => 'PTN Buildings',
+    'fields' => array(
+      'bid' => array(
+        'description' => 'Building ID',
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'building_name' => array(
+        'description' => 'Building Name',
+        'type' => 'varchar',
+        'length' => 250,
+        'not null' => TRUE,
+      ),
+      'elec_or_man' => array(
+        'description' => 'Electric or Manual',
+        'type' => 'varchar',
+        'length' => 25,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('bid'),
+  );
+
+  $schema['ptn_building_doors'] = array(
+    'description' => 'PTN Building Doors',
+    'fields' => array(
+      'did' => array(
+        'description' => 'Door ID',
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'bid' => array(
+        'description' => 'Building ID',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'door_name' => array(
+        'description' => 'Door Name',
+        'type' => 'varchar',
+        'length' => 250,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('did'),
+  );
+
+  $schema['ptn_building_approval_or_dissaproval'] = array(
+    'description' => 'PTN Building Approval or Dissaproval Table',
+    'fields' => array(
+      'bid' => array(
+        'description' => 'Building ID',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'aord' => array(
+        'description' => 'Approved or Dissaproved',
+        'type' => 'int',
+        'length' => 1,
+        'not null' => TRUE,
+      ),
+      'autoinc' => array(
+        'description' => 'Auto Incrementing ID',
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('autoinc'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Cutom activity on install
+ */
+function ptn_doors_install() {
+  // (none)
+}
+
+/**
+ * Cutom activity on uninstall
+ */
+function ptn_doors_uninstall() {
+  // (none)
+}

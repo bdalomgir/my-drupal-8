@@ -1,0 +1,47 @@
+name = Princeton Public Safety
+description = 
+core = 7.x
+
+stylesheets[all][] = style.css
+
+scripts[] = js/jquery.cycle.all.min.js
+scripts[] = http://html5shiv.googlecode.com/svn/trunk/html5.js
+
+regions[header]    = Header
+regions[search]    = Search
+regions[toparticle] = Top Article
+regions[clery_def] = Clery Def
+regions[help]      = Help
+regions[content]   = Content
+regions[sidebar]   = Sidebar
+regions[about]     = About
+regions[safety]    = Safety
+regions[emergency] =  Emergency
+regions[clery]     =  Clery
+regions[contact]   =  Contact
+regions[slideshow] = Slideshow
+regions[menu]      = Menu
+regions[news]      = News
+regions[faculty]    = Faculty
+regions[parents]    = Parents
+regions[students]    = Students
+regions[visitors]    = Visitors
+regions[testimonial]    = Testimonial
+regions[resources]    = Resources
+regions[community]    = Community
+regions[gallery]    = Gallery
+regions[featured] = Featured Post
+regions[blog] = Blog
+regions[alert] = Alert
+regions[report] = Report
+regions[blogmenu] = Blog Menu
+regions[popular]	= Popular Post
+regions[newsmenu]	= News Menu
+regions[directory] = Dps Directory
+regions[facebook] = Facebook
+regions[rightmenu] = Right Side Menu
+
+version = "7.x-2.3"
+core = "7.x"
+project = "princeton"
+datestamp = "1354216013"

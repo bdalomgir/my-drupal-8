@@ -1,0 +1,139 @@
+<?php
+ namespace Drupal\ptn_doors\Form;
+
+ use Drupal\Core\Form\FormBase;
+ use Drupal\Core\Form\FormStateInterface;
+ use Drupal\file\Entity\File;
+ use Drupal\file\FileInterface;
+
+ class DoorsAdminImportForm extends FormBase {
+   public $PTNDoors;
+
+   public function __construct(){
+     $this->PTNDoors = new \Drupal\ptn_doors\PTNDoors();
+   }
+
+   public function getFormId() {
+     return 'doors_admin_import_form';
+   }
+
+   public function buildForm(array $form, FormStateInterface $form_state) {
+
+     // build form
+
+     $form = array();
+
+     $form['utility_links'] = array(
+       '#markup' => $this->PTNDoors->ptn_doors_get_utility_links()
+     );
+
+     $form['heading'] = array(
+       '#markup' => '<h1>Import Buildings and Doors</h1>'
+     );
+
+     $form['building_import'] = array(
+       '#type' => 'file',
+       '#title' => t('Building Import'),
+     );
+
+     $form['door_import'] = array(
+       '#type' => 'file',
+       '#title' => t('Door Import'),
+     );
+
+     $form['submit'] = array('#type' => 'submit', '#value' => t('Import Buildings and Doors'));
+     $form['#submit'][] = 'ptn_doors_import_buildings_and_doors_submit';
+
+     return $form;
+   }
+
+   public function validateForm(array &$form, FormStateInterface $form_state) {
+     foreach(array('building_import','door_import') as $file_name){
+       $file = file_save_upload($file_name, array(
+         'file_validate_extensions' => array('csv'),
+       ));
+
+       var_dump($file);
+
+       // If the file passed validation:
+       if ($file) {
+         // Move the file into the Drupal file system.
+         if ($file = file_move($file, 'public://')) {
+           // Save the file for use in the submit handler.
+           $form_state->set(['storage', $file_name], $file);
+         } else {
+           $form_state->setErrorByName('choice', $this->t("Failed to write the uploaded file to the site's file folder."));
+           //form_set_error($file_name, t("Failed to write the uploaded file to the site's file folder."));
+         }
+       } else {
+         $form_state->setErrorByName($file_name, $this->t('No file was uploaded or it is not a CSV. %file_name', array('file_name' => $file_name)));
+         //form_set_error($file_name, t('No file was uploaded or it is not a CSV.'));
+       }
+     }
+   }
+
+   public function submitForm(array &$form, FormStateInterface $form_state) {
+
+     foreach(array($form_state->get('building_import'), $form_state->get('door_import')) as $file_name){
+       $file = file_save_upload($file_name, array(
+         'file_validate_extensions' => array('csv'),
+       ));
+
+       // If the file passed validation:
+       if ($file) {
+         // Move the file into the Drupal file system.
+         if ($file = file_move($file, 'public://')) {
+           // Save the file for use in the submit handler.
+           $form_state->set(['storage', $file_name], $file);
+         }
+       }
+     }
+
+    $building_file = $form_state['storage']['building_import'];
+    $door_file = $form_state['storage']['door_import'];
+    unset($form_state['storage']['building_import']);
+    unset($form_state['storage']['door_import']);
+    $building_file->status = FILE_STATUS_PERMANENT;
+    $door_file->status = FILE_STATUS_PERMANENT;
+
+    file_save($building_file);
+    file_save($door_file);
+
+    $building_csv = array_map('str_getcsv', file(drupal_realpath($building_file->uri)));
+    $is_buildings_valid = importBuildingsValidation($building_csv);
+    if($is_buildings_valid[0] === true){
+      $door_csv = array_map('str_getcsv', file(drupal_realpath($door_file->uri)));
+      $is_doors_valid = importDoorsValidation($door_csv, $is_buildings_valid[2]);
+      if($is_doors_valid[0] === true){
+        db_truncate('ptn_buildings')->execute();
+        db_truncate('ptn_building_doors')->execute();
+        importBuildings($building_csv);
+        importDoors($door_csv);
+        file_delete(file_load($door_file->fid));
+        file_delete(file_load($building_file->fid));
+      } else if ($is_doors_valid[0] === false || empty($is_doors_valid[0])){
+        $error = (isset($is_doors_valid[0]) && !empty($is_doors_valid[1])) ? $is_doors_valid[1] : "An Unknown Error Occured with Door Validation";
+      }
+    } else if ($is_buildings_valid[0] === false || empty($is_buildings_valid[0])){
+      $error =  (isset($is_buildings_valid[0]) && !empty($is_buildings_valid[1])) ? $is_buildings_valid[1] : "An Unknown Error Occured with Building Validation";
+    }
+
+    if(!empty($error)){
+      drupal_set_message($error, 'error');
+    }
+
+    //Validatate Buildings - Done
+    //Validate Doors - Done
+    //Check if doors BID exists in buildings array - Done
+    //truncate tables - Done
+    //insert data into new tables - Done
+    //delete uploaded files
+
+
+    //importDoors(drupal_realpath($door_file->uri));
+    //importBuildings(drupal_realpath($building_file->uri));
+   }
+
+
+ }
+?>

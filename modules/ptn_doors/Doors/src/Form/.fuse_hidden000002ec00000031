@@ -1,0 +1,278 @@
+<?php
+ namespace Drupal\ptn_doors\Form;
+
+ use Drupal\Core\Form\FormBase;
+ use Drupal\Core\Form\FormStateInterface;
+ use Drupal\file\Entity\File;
+ use Drupal\file\FileInterface;
+
+ class DoorsAdminImportForm extends FormBase {
+   public $PTNDoors;
+
+   public function __construct(){
+     $this->PTNDoors = new \Drupal\ptn_doors\PTNDoors();
+   }
+
+   public function getFormId() {
+     return 'doors_admin_import_form';
+   }
+
+   public function buildForm(array $form, FormStateInterface $form_state) {
+
+     // build form
+
+     $form = array();
+
+     $form['utility_links'] = array(
+       '#markup' => $this->PTNDoors->ptn_doors_get_utility_links()
+     );
+
+     $form['heading'] = array(
+       '#markup' => '<h1>Import Buildings and Doors</h1>'
+     );
+
+     $form['building_import'] = array(
+       '#type' => 'managed_file',
+       '#upload_location' => 'temporary://',
+       '#upload_validators' => array(
+         'file_validate_extensions' => array('csv'),
+       ),
+       '#title' => t('Building Import'),
+     );
+
+     $form['door_import'] = array(
+       '#type' => 'managed_file',
+       '#upload_location' => 'temporary://',
+       '#upload_validators' => array(
+         'file_validate_extensions' => array('csv'),
+       ),
+       '#title' => t('Door Import'),
+     );
+
+     $form['submit'] = array('#type' => 'submit', '#value' => t('Import Buildings and Doors'));
+
+     return $form;
+   }
+
+   public function validateForm(array &$form, FormStateInterface $form_state) {
+     foreach(array('building_import','door_import') as $file_name){
+       /*
+       $file = file_save_upload($file_name, array(
+         'file_validate_extensions' => array('csv'),
+       ), FALSE, 0);
+       */
+       $file_data = $form_state->getValue($file_name);
+       $file = File::load( $file_data[0] );
+
+       // If the file passed validation:
+       if ($file) {
+         $file->setPermanent();
+         $file->save();
+         $file = file_move($file, 'public://', FILE_EXISTS_REPLACE);
+         if($file){
+           $form_state->set(['storage', $file_name], $file);
+         } else {
+           $form_state->setErrorByName($file_name, $this->t('The file %file_name failed to save to public', array('file_name' => $file_name)));
+         }
+       } else {
+         $form_state->setErrorByName($file_name, $this->t('No file was uploaded or it is not a CSV. %file_name', array('file_name' => $file_name)));
+         //form_set_error($file_name, t('No file was uploaded or it is not a CSV.'));
+       }
+     }
+   }
+
+   public function submitForm(array &$form, FormStateInterface $form_state) {
+
+    $building_file = $form_state->get(['storage', 'building_import']);
+    $door_file = $form_state->get(['storage', 'door_import']);
+    $form_state->unsetValue(['storage', 'building_import']);
+    $form_state->unsetValue(['storage', 'door_import']);
+    //unset($form_state['storage']['building_import']);
+    //unset($form_state['storage']['door_import']);
+    //$building_file->status = FILE_STATUS_PERMANENT;
+    //$door_file->status = FILE_STATUS_PERMANENT;
+    //$building_file->save();
+    //$door_file->save();
+    //file_save($building_file);
+    //file_save($door_file);
+
+    $building_csv = array_map('str_getcsv', file(drupal_realpath($building_file->uri)));
+    $is_buildings_valid = $this->importBuildingsValidation($building_csv);
+    if($is_buildings_valid[0] === true){
+      $door_csv = array_map('str_getcsv', file(drupal_realpath($door_file->uri)));
+      $is_doors_valid = $this->importDoorsValidation($door_csv, $is_buildings_valid[2]);
+      if($is_doors_valid[0] === true){
+        db_truncate('ptn_buildings')->execute();
+        db_truncate('ptn_building_doors')->execute();
+        $this->importBuildings($building_csv);
+        $this->importDoors($door_csv);
+        file_delete(file_load($door_file->fid));
+        file_delete(file_load($building_file->fid));
+      } else if ($is_doors_valid[0] === false || empty($is_doors_valid[0])){
+        $error = (isset($is_doors_valid[0]) && !empty($is_doors_valid[1])) ? $is_doors_valid[1] : "An Unknown Error Occured with Door Validation";
+      }
+    } else if ($is_buildings_valid[0] === false || empty($is_buildings_valid[0])){
+      $error =  (isset($is_buildings_valid[0]) && !empty($is_buildings_valid[1])) ? $is_buildings_valid[1] : "An Unknown Error Occured with Building Validation";
+    }
+
+    if(!empty($error)){
+      drupal_set_message($error, 'error');
+    }
+
+    //Validatate Buildings - Done
+    //Validate Doors - Done
+    //Check if doors BID exists in buildings array - Done
+    //truncate tables - Done
+    //insert data into new tables - Done
+    //delete uploaded files
+
+
+    //importDoors(drupal_realpath($door_file->uri));
+    //importBuildings(drupal_realpath($building_file->uri));
+   }
+
+   public function importBuildingsValidation($csv){
+     $error = "";
+     $building_id_array = array();
+     if(count($csv[0]) === 3){
+       if($csv[0][0] === "BID" && $csv[0][1] === "Name" && $csv[0][2] === "Type"){
+         foreach ($csv as $csv_key => $csv_array) {
+           if(count($csv_array) === 3){
+             if($csv_key !== 0){
+               if(is_numeric($csv_array[0]) && ($csv_array[2] == "ELEC" || $csv_array[2] == "MAN")){
+                 array_push($building_id_array, $csv_array[0]);
+                 if((count($csv) - 1) === $csv_key){
+                   return array(true, false, $building_id_array);
+                 }
+               } else {
+                 $error = sprintf("Invalid value in row %d", $csv_key);
+                 break;
+               }
+             }
+           } else {
+             $error = sprintf("Rows %d has to many columns/values", $csv_key);
+             break;
+           }
+         }
+       } else {
+         $error = "Incorrect CSV format, column headers are named incorrectly or in the wrong order";
+       }
+     } else {
+       $error = "Incorrect CSV format, to many columns Buildings";
+     }
+
+     return array(false, $error, $building_id_array);
+   }
+
+   public function importDoorsValidation($csv, $building_id_list){
+     $error = "";
+     $building_id_list_doors = array();
+     if(count($csv[0]) === 2){
+       if($csv[0][0] === "BID" && $csv[0][1] === "Name"){
+         foreach ($csv as $csv_key => $csv_array) {
+           if(count($csv_array) === 2){
+             if($csv_key !== 0){
+               if(is_numeric($csv_array[0])){
+                 array_push($building_id_list_doors, $csv_array[0]);
+                 if((count($csv) - 1) === $csv_key){
+                   $buildings_non_existant = array_diff($building_id_list_doors, $building_id_list);
+                   $doors_non_existant = array_diff($building_id_list, $building_id_list_doors);
+                   if(empty($buildings_non_existant) && empty($doors_non_existant)){
+                     return array(true, false);
+                   } else {
+                     if(!empty($buildings_non_existant)){
+                       foreach ($buildings_non_existant as $buildings_non_existant_id) {
+                         drupal_set_message('Building ID '.$buildings_non_existant_id.' doesn\'t exist.', 'error');
+                       }
+                     }
+                     if(!empty($doors_non_existant)){
+                       foreach ($doors_non_existant as $doors_non_existant_id) {
+                         drupal_set_message('Building ID '.$doors_non_existant_id.' doesn\'t have any doors set.', 'error');
+                       }
+                     }
+                     $error = "Please verify that buildings exist and have doors in the CSV files.";
+                   }
+                 }
+               } else {
+                 $error = sprintf("Invalid value in row %d", $csv_key);
+                 break;
+               }
+             }
+           } else {
+             $error = sprintf("Rows %d has to many columns/values", $csv_key);
+             break;
+           }
+         }
+       } else {
+         $error = "Incorrect CSV format, column headers are named incorrectly or in the wrong order";
+       }
+     } else {
+       $error = "Incorrect CSV format, to many columns Doors";
+     }
+
+     return array(false, $error);
+   }
+
+   public function importDoors($csv){
+       $buildings = array();
+       foreach ($csv as $csv_key => $csv_array) {
+         if($csv_array[0] === "BID"){
+           continue;
+         }
+         if(empty($buildings[$csv_array[0]])){
+           $buildings[$csv_array[0]] = array();
+         }
+         array_push($buildings[$csv_array[0]], $csv_array[1]);
+       }
+
+     //In order to keep things organized and clustered together in the database, an array is created for each building for organization purposes
+     foreach ($buildings as $bid => $door_array) {
+       // add door record
+       foreach ($door_array as $door) {
+         try {
+           db_insert('ptn_building_doors')
+             ->fields(array(
+               'bid' => t($bid),
+               'door_name' => t($door),
+             ))
+             ->execute();
+         } catch (PDOException $e) {
+           drupal_set_message(t('Error: %message', array('%message' => $e->getMessage())), 'error');
+         }
+
+       }
+     }
+   }
+
+   public function importBuildings($csv){
+     $buildings = array();
+     foreach ($csv as $csv_key => $csv_array) {
+       if($csv_array[0] === "BID"){
+         continue;
+       }
+       if(empty($buildings[$csv_array[0]])){
+         $buildings[$csv_array[0]] = array();
+       }
+       array_push($buildings[$csv_array[0]], array($csv_array[1], $csv_array[2]));
+     }
+
+     //In order to keep things organized and clustered together in the database, an array is created for each building for organization purposes
+     foreach ($buildings as $bid => $building_data) {
+       foreach ($building_data as $building) {
+         try {
+           db_insert('ptn_buildings')
+             ->fields(array(
+               'bid' => t($bid),
+               'building_name' => t($building[0]),
+               'elec_or_man' => t($building[1]),
+             ))
+             ->execute();
+         } catch (PDOException $e) {
+           drupal_set_message(t('Error: %message', array('%message' => $e->getMessage())), 'error');
+         }
+       }
+     }
+   }
+
+ }
+?>

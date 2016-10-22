@@ -1,0 +1,119 @@
+
+/*
+  public function ptnDoorsAjax(array &$form, FormStateInterface $form_state){
+    $buildings = array();
+    $buildings[''] = '-- Select A Building --';
+    $result = db_query('SELECT * FROM ptn_buildings ORDER BY building_name ASC');
+    foreach ($result as $record) {
+      $buildings[$record->bid] = $record->building_name;
+    }
+    // building count
+    $building_max = 5;
+    $building_max_reached = FALSE;
+    $building_count_storage = $form_state->get(['storage', 'building_count']);
+    if(isset($building_count_storage)) {
+      $building_count = $building_count_storage;
+    } else {
+      $building_count = 1;
+      $form_state->set(['storage', 'building_count'], $building_count);
+    }
+
+    $form['buildings_wrapper'] = array('#prefix' => '<div id="buildings-wrapper">', '#suffix' => '</div>');
+
+     // display buildings
+     for($i=1; $i<=$building_count; $i++) {
+
+       // cap building list at 5
+       if ($i > $building_max) {
+         $form['buildings_wrapper']['building_spacer_' . $i] = array('#markup' => '<br/><br/><p><strong>(limit ' . $building_max . ' buildings)</strong></p>');
+         $building_max_reached = TRUE;
+         continue;
+       }
+
+       // spacer
+       $form['buildings_wrapper']['building_spacer_' . $i] = array('#markup' => '<strong>Building ' . $i . '</strong><hr/>');
+
+       // building selector
+       $form['buildings_wrapper']['building_id_' . $i] = array(
+         '#type' => 'select',
+         '#title' => t('Please select a building you are requesting access to'),
+         '#required' => TRUE,
+         '#options' => $buildings,
+         '#ajax' => array(
+           'event' => 'change',
+           'wrapper' => 'door-wrapper-' . $i,
+           'callback' => array($this, 'ptnDoorsAjax'),
+           'method' => 'replace',
+         ),
+       );
+
+       // door selector
+       $form['buildings_wrapper']['door_wrapper_' . $i] = array('#prefix' => '<div id="door-wrapper-' . $i . '">', '#suffix' => '</div>');
+
+       // add doors for building, if selected
+       if(!empty( $form_state->get(['input', 'building_id_' . $i]) )) {
+
+         // exterior doors
+         $bid_for_doors = $form_state->get(['input', 'building_id_' . $i]);
+         $door_cb_list = '<label for="door-wrapper-' . $i . '">Please Select which Doors You Need Access To For This Building</label>';
+         $door_count = 0;
+         $result = db_query('SELECT * FROM ptn_building_doors WHERE bid = :bid ORDER BY door_name', array(':bid' => t($bid_for_doors)));
+         foreach ($result as $record) {
+           $form_state_building_id = $form_state->get(['input', 'building_id_' . $i]);
+           $checked_value = (isset( $form_state_building_id )) ? 'CHECKED' : '';
+           $door_cb_list .= '<input type="checkbox" name="edit-did-' . $i . '-' . $record->did . '" value="SELECTED" ' . $checked_value . '> ' . $record->door_name .'';
+           $door_count++;
+         }
+         if ($door_count == 0) $door_cb_list .= "<p>(none available)</p>";
+         $form['buildings_wrapper']['door_wrapper_' . $i]['exterior_' . $i] = array('#markup' => $door_cb_list);
+
+         // interior doors
+         $form['buildings_wrapper']['door_wrapper_' . $i]['interior_' . $i] = array(
+           '#type' => 'textfield',
+           '#title' => t('Please List All Interior Room Numbers You Need Access To'),
+           '#size' => 10,
+           '#maxlength' => 250,
+         );
+
+       }
+
+       if(!$building_max_reached && $i == $building_count) {
+         $form['buildings_wrapper']['door_wrapper_' . $i]['add_spacer_1'] = array('#markup' => '');
+         $form['buildings_wrapper']['door_wrapper_' . $i]['add_more'] = array(
+           '#type' => 'submit',
+           //'#submit' => array($this, 'ptnDoorsPublicRequestAddBuildingSubmit'),
+           '#value' => t('[+] Add Another Building'),
+           '#ajax' => array(
+             'callback' => array($this, 'ptnDoorsPublicRequestAddBuilding'),
+             'wrapper' => 'buildings-wrapper',
+             'method' => 'replace',
+             'effect' => 'fade',
+           ),
+         );
+         $form['buildings_wrapper']['door_wrapper_' . $i]['add_spacer_2'] = array('#markup' => '');
+       }
+
+
+       if($building_count > 1) {
+         $form['buildings_wrapper']['door_wrapper_' . $i]['add_spacer_1'] = array('#markup' => '');
+         $form['buildings_wrapper']['door_wrapper_' . $i]['add_more'] = array(
+           '#type' => 'submit',
+           "#limit_validation_errors" => array(),
+          // '#submit' => array($this, 'ptnDoorsPublicRequestRemoveBuildingSubmit'),
+           '#value' => t('[-] Remove Building'),
+   	    '#attributes' => array(
+           'class' => array('remove'),
+        ),
+           '#ajax' => array(
+             'callback' => array($this, 'ptnDoorsPublicRequestRemoveBuilding'),
+             'wrapper' => 'buildings-wrapper',
+             'method' => 'replace',
+             'effect' => 'fade',
+           ),
+         );
+         $form['buildings_wrapper']['door_wrapper_' . $i]['add_spacer_2'] = array('#markup' => '');
+       }
+     }
+     return $form['buildings_wrapper'];
+  }
+*/

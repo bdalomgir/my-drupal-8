@@ -1,0 +1,53 @@
+{# #}
+
+{% if is_front %}
+{% endif %}
+
+<div class="row cover custom-image">
+     {{ page.slideshow }}
+</div>
+
+{% if(cover_image) %}
+    <section class="row cover" style="background-image: url({{ cover_image }});"></section>
+{% endif %}
+wefawefawef
+<section class="row nav">
+	<div class="row content">
+        <div class="row nav">
+            <div class="row heading"><h5>Navigate This Section</h5></div>
+            <div class="row data">
+                <ul>
+                <li class="active parent"><a href="">Parent</a>
+                    <ul>
+                    <li><a href="">Child</a></li>
+                    <li><a href="">Child</a></li>
+                    <li><a href="">Child</a></li>
+                    <li><a href="">Child</a></li>
+                    <li><a href="">Child</a></li>
+                    </ul>
+                </li>
+                <li><a href="">Link</a></li>
+                <li><a href="">Link</a></li>
+                <li><a href="">Link</a></li>
+                <li><a href="">Link</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section><!-- row.nav -->
+
+{% if page.content %}
+	<section class="row main ">
+		<div class="row content">
+			<div class=" prime">
+				<div class="row box">
+					<div class="row heading"><h2>Gallery</h2></div>
+					<div class="row bread">
+						{{ page.breadcrumb }}
+					</div>
+					<div class="row entry">{{ page.content }}</div>
+				</div>
+			</div>
+		</div><!-- row.content -->
+	</section>
+{% endif %}

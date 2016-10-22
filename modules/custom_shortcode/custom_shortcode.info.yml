@@ -1,0 +1,5 @@
+name: Custom Short Code
+type: module
+description: 'Make Filter Short code and replace token'
+package: 'Custom'
+core: 8.x

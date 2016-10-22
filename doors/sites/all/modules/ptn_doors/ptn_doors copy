@@ -1,0 +1,2398 @@
+<?php
+
+function ptn_doors_menu() {
+  global $base_url;
+
+  $items['request'] = array(
+    'title' => 'Building and Door Request Form',
+    'description' => 'Request building access',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_doors_public_request_form'),
+    'access arguments' => array('access content'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+
+  $items['door-request-approve/%'] = array(
+    'title' => 'Building and Door Request Approval Form',
+    'description' => 'Approve or Deny a Door Request',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_doors_request_approval_form', 1),
+    'access arguments' => array('administer users'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+
+  $items['admin/ptn_doors/main'] = array(
+    'title' => 'Building and Door Request Management',
+    'description' => 'Configure building and door request settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_doors_main'),
+    'access arguments' => array('administer users'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+
+  $items['admin/ptn_doors/notifications'] = array(
+    'title' => 'Building and Door Request Management - Notification Settings',
+    'description' => 'Notification Settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_doors_notification_settings'),
+    'access arguments' => array('administer users'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+
+  $items['admin/ptn_doors/import'] = array(
+    'title' => 'Building and Door Request Management - Import Buildings and Doors',
+    'description' => 'Import buildings and doors',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_doors_import_buildings_and_doors'),
+    'access arguments' => array('administer users'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+
+
+  $items['admin/ptn_doors/add_building'] = array(
+    'title' => 'Building and Door Request Management - Add a Building',
+    'description' => 'Add a building',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_doors_add_building'),
+    'access arguments' => array('administer users'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+
+  $items['admin/ptn_doors/edit_building/%'] = array(
+    'title' => 'Edit One Building',
+    'description' => 'Edit One Building',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_doors_edit_building', 3),
+    'access arguments' => array('administer users'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+
+  $items['admin/ptn_doors/remove_door/%'] = array(
+    'title' => 'Remove One Door',
+    'description' => 'Remove One Door',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_doors_remove_door', 3),
+    'access arguments' => array('administer users'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+
+  $items['admin/ptn_doors/remove_contact/%/%'] = array(
+    'title' => 'Remove One Contact',
+    'description' => 'Remove One Contact',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ptn_doors_remove_contact', 3, 4),
+    'access arguments' => array('administer users'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ * Wrapper for working with d7 mail
+ */
+function ptn_doors_custom_mail($from = NULL, $to, $subject, $message) {
+
+  // set params
+  $my_module = 'ptn_doors';
+  $my_mail_token = microtime();
+  if (empty($from)) $from = variable_get('site_mail', 'webmaster@princeton.edu');
+
+
+  $message = array(
+    'id' => $my_module . '_' . $my_mail_token,
+    'to' => $to,
+    'subject' => $subject,
+    'body' => array($message),
+    'headers' => array(
+      'From' => $from,
+      'Sender' => $from,
+      'Return-Path' => $from,
+    ),
+  );
+  $system = drupal_mail_system($my_module, $my_mail_token);
+  $message = $system->format($message);
+  if ($system->mail($message)) {
+    return TRUE;
+  }
+  else {
+    return FALSE;
+  }
+}
+
+/**
+ * For generating a reusable custom admin utility nav
+ */
+function _ptn_doors_get_utility_links() {
+  global $base_url;
+
+  $utility_links = "Utilities: ";
+  $utility_links .= "<a href='".$base_url."/admin/ptn_doors/main'>buildings</a> | ";
+  $utility_links .= "<a href='".$base_url."/admin/ptn_doors/add_building'>add building</a> | ";
+  $utility_links .= "<a href='".$base_url."/admin/ptn_doors/import'>import buildings and doors</a> | ";
+  $utility_links .= "<a href='".$base_url."/admin/ptn_doors/notifications'>notification settings</a>";
+  $utility_links .= "<hr/>";
+  return $utility_links;
+}
+
+/**
+ * Building/Door request management - main form
+ */
+function ptn_doors_main() {
+  global $base_url;
+  // function params
+  $form = array();
+  $buildings = array();
+  $building_list_html = '<p><ul>';
+
+  // read list of buildings
+  $result = db_query('SELECT * FROM ptn_buildings ORDER BY building_name ASC');
+  foreach ($result as $record) {
+    $buildings[$record->bid] = $record->building_name;
+	$building_edit_link = ''.$base_url.'/admin/ptn_doors/edit_building/' . $record->bid;
+    $building_list_html .= '<li><a href="' . $building_edit_link . '">' . $record->building_name . '</a></li>';
+  }
+  $building_list_html .= '</ul></p>';
+
+  // build form
+  $form['utility_links'] = array(
+    '#markup' => _ptn_doors_get_utility_links()
+  );
+
+  $form['heading'] = array(
+    '#markup' => '<h1>Building and Door Request Management</h1>'
+  );
+
+  $form['building_links'] = array(
+    '#markup' => $building_list_html
+  );
+
+  $form['#submit'] = array();
+
+  // return
+  return $form;
+
+}
+
+/**
+ * Building/Door request management - notification settings
+ */
+function ptn_doors_notification_settings() {
+
+  // build form
+
+  $form = array();
+
+  $form['utility_links'] = array(
+    '#markup' => _ptn_doors_get_utility_links()
+  );
+
+  // electric contacts
+
+  $form['heading_electric'] = array(
+    '#markup' => '<h2>Contacts for Electric Doors</h2>'
+  );
+
+  $form['electric_contacts'] = array(
+    '#markup' => _ptn_doors_get_notification_contacts('electric')
+  );
+
+  $form['electric_new'] = array(
+    '#type' => 'textfield',
+    '#size' => 25,
+    '#maxlength' => 100,
+    '#default_value' => 'electric@princeton.edu',
+    '#attributes' => array(
+        'onclick' => 'this.value="";'
+     ),
+  );
+
+  $form['electric_add'] = array(
+    '#type' => 'submit',
+    '#value' => t('Add Electric Door Contact'),
+    '#submit' => array('ptn_doors_email_notification_add'), // If no javascript action.
+    '#ajax' => array(
+      'callback' => 'ptn_doors_email_notification_list_js',
+      'wrapper' => 'contact-list-electric',
+      'method' => 'replace',
+      'effect' => 'fade',
+    ),
+  );
+
+  // manual contacts
+
+  $form['heading_manual'] = array(
+    '#markup' => '<h2>Contacts for Manual Doors</h2>'
+  );
+
+  $form['manual_contacts'] = array(
+    '#markup' => _ptn_doors_get_notification_contacts('manual')
+  );
+
+  $form['manual_new'] = array(
+    '#type' => 'textfield',
+    '#size' => 25,
+    '#maxlength' => 100,
+    '#default_value' => 'manual@princeton.edu',
+    '#attributes' => array(
+        'onclick' => 'this.value="";'
+     ),
+  );
+
+  $form['manual_add'] = array(
+    '#type' => 'submit',
+    '#value' => t('Add Manual Door Contact'),
+    '#submit' => array('ptn_doors_email_notification_add'), // If no javascript action.
+    '#ajax' => array(
+      'callback' => 'ptn_doors_email_notification_list_js',
+      'wrapper' => 'contact-list-manual',
+      'method' => 'replace',
+      'effect' => 'fade',
+    ),
+  );
+
+  // return
+  return $form;
+
+}
+
+/**
+ * Building/Door request management - add a building
+ */
+function ptn_doors_add_building() {
+
+  // build form
+
+  $form = array();
+
+  $form['utility_links'] = array(
+    '#markup' => _ptn_doors_get_utility_links()
+  );
+
+  $form['heading'] = array(
+    '#markup' => '<h1>Add a Building</h1>'
+  );
+
+  $form['building_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Building Name'),
+    '#size' => 25,
+    '#maxlength' => 100,
+    '#required' => TRUE,
+    '#description' => t('e.g. <em>2 DICKINSON ST</em>.'),
+
+  );
+
+  $form['elec_or_man'] = array(
+    '#type' => 'select',
+    '#title' => t('Access Type'),
+    '#options' => array(
+      'ELEC' => t('Electric'),
+      'MAN' => t('Manual'),
+    ),
+    '#default_value' => 'ELEC',
+  );
+
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Add Building'));
+  $form['#submit'][] = 'ptn_doors_add_building_submit';
+
+  // return
+  return $form;
+
+}
+
+/**
+ * For handling submission of building-add form
+ */
+function ptn_doors_add_building_submit($form, &$form_state) {
+
+  // parse form values
+  $building_name = $form_state['input']['building_name'];
+  $elec_or_man = $form_state['input']['elec_or_man'];
+
+  $bid = db_insert('ptn_buildings')->fields(array(
+          'building_name' => $building_name,
+          'elec_or_man' => $elec_or_man
+        ))->execute();
+
+
+
+  drupal_set_message('Building "' . $building_name . '" has been added.');
+  drupal_goto('admin/ptn_doors/main');
+
+}
+
+/**
+ * Building/Door request management - add a building
+ */
+function ptn_doors_import_buildings_and_doors() {
+
+  // build form
+
+  $form = array();
+
+  $form['utility_links'] = array(
+    '#markup' => _ptn_doors_get_utility_links()
+  );
+
+  $form['heading'] = array(
+    '#markup' => '<h1>Import Buildings and Doors</h1>'
+  );
+
+  $form['building_import'] = array(
+    '#type' => 'file',
+    '#title' => t('Building Import'),
+  );
+
+  $form['door_import'] = array(
+    '#type' => 'file',
+    '#title' => t('Door Import'),
+  );
+
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Import Buildings and Doors'));
+  $form['#submit'][] = 'ptn_doors_import_buildings_and_doors_submit';
+
+  //var_dump(ptn_doors_get_notification_emails("electric"));
+  //var_dump(ptn_doors_get_notification_emails("manual"));
+  // return
+  return $form;
+
+}
+
+/**
+ * For handling submission of building and door import form
+ */
+function ptn_doors_import_buildings_and_doors_submit($form, &$form_state) {
+
+  foreach(array('building_import','door_import') as $file_name){
+    $file = file_save_upload($file_name, array(
+      'file_validate_extensions' => array('csv'),
+    ));
+
+    // If the file passed validation:
+    if ($file) {
+      // Move the file into the Drupal file system.
+      if ($file = file_move($file, 'public://')) {
+        // Save the file for use in the submit handler.
+        $form_state['storage'][$file_name] = $file;
+      } else {
+        form_set_error($file_name, t("Failed to write the uploaded file to the site's file folder."));
+      }
+    } else {
+      form_set_error($file_name, t('No file was uploaded or it is not a CSV.'));
+    }
+  }
+
+  $building_file = $form_state['storage']['building_import'];
+  $door_file = $form_state['storage']['door_import'];
+  unset($form_state['storage']['building_import']);
+  unset($form_state['storage']['door_import']);
+  $building_file->status = FILE_STATUS_PERMANENT;
+  $door_file->status = FILE_STATUS_PERMANENT;
+
+  file_save($building_file);
+  file_save($door_file);
+
+  $building_csv = array_map('str_getcsv', file(drupal_realpath($building_file->uri)));
+  $is_buildings_valid = importBuildingsValidation($building_csv);
+  if($is_buildings_valid[0] === true){
+    $door_csv = array_map('str_getcsv', file(drupal_realpath($door_file->uri)));
+    $is_doors_valid = importDoorsValidation($door_csv, $is_buildings_valid[2]);
+    if($is_doors_valid[0] === true){
+      db_truncate('ptn_buildings')->execute();
+      db_truncate('ptn_building_doors')->execute();
+      importBuildings($building_csv);
+      importDoors($door_csv);
+      file_delete(file_load($door_file->fid));
+      file_delete(file_load($building_file->fid));
+    } else if ($is_doors_valid[0] === false || empty($is_doors_valid[0])){
+      $error = (isset($is_doors_valid[0]) && !empty($is_doors_valid[1])) ? $is_doors_valid[1] : "An Unknown Error Occured with Door Validation 1";
+    }
+  } else if ($is_buildings_valid[0] === false || empty($is_buildings_valid[0])){
+    $error =  (isset($is_buildings_valid[0]) && !empty($is_buildings_valid[1])) ? $is_buildings_valid[1] : "An Unknown Error Occured with Building Validation";
+  }
+
+  if(!empty($error)){
+    drupal_set_message($error, 'error');
+  }
+
+  //Validatate Buildings - Done
+  //Validate Doors - Done
+  //Check if doors BID exists in buildings array - Done
+  //truncate tables - Done
+  //insert data into new tables - Done
+  //delete uploaded files
+
+
+  //importDoors(drupal_realpath($door_file->uri));
+  //importBuildings(drupal_realpath($building_file->uri));
+}
+
+function importBuildingsValidation($csv){
+  $error = "";
+  $building_id_array = array();
+  if(count($csv[0]) === 2){
+    if($csv[0][0] === "BID" && $csv[0][1] === "Name"){
+      foreach ($csv as $csv_key => $csv_array) {
+        if(count($csv_array) === 2){
+          if($csv_key !== 0){
+            if(is_numeric($csv_array[0])){
+              array_push($building_id_array, $csv_array[0]);
+              if((count($csv) - 1) === $csv_key){
+                return array(true, false, $building_id_array);
+              }
+            } else {
+              $error = sprintf("Invalid value in row %d", $csv_key);
+              break;
+            }
+          }
+        } else {
+          $error = sprintf("Rows %d has to many columns/values 2", $csv_key);
+          break;
+        }
+      }
+    } else {
+      $error = "Incorrect CSV format, column headers are named incorrectly or in the wrong order";
+    }
+  } else {
+    $error = "Incorrect CSV format, to many columns 1";
+  }
+
+  return array(false, $error, $building_id_array);
+}
+
+function importDoorsValidation($csv, $building_id_list){
+  $error = "";
+  $building_id_list_doors = array();
+  if(count($csv[0]) === 3){
+    if($csv[0][0] === "BID" && $csv[0][1] === "Name" && $csv[0][2] === "Emails"){
+      foreach ($csv as $csv_key => $csv_array) {
+        if(count($csv_array) === 3){
+          if($csv_key !== 0){
+            if(is_numeric($csv_array[0])){
+              array_push($building_id_list_doors, $csv_array[0]);
+              if((count($csv) - 1) === $csv_key){
+                $buildings_non_existant = array_diff($building_id_list_doors, $building_id_list);
+                $doors_non_existant = array_diff($building_id_list, $building_id_list_doors);
+                if(empty($buildings_non_existant) && empty($doors_non_existant)){
+                  return array(true, false);
+                } else {
+                  if(!empty($buildings_non_existant)){
+                    foreach ($buildings_non_existant as $buildings_non_existant_id) {
+                      drupal_set_message('Building ID '.$buildings_non_existant_id.' doesn\'t exist.', 'error');
+                    }
+                  }
+                  if(!empty($doors_non_existant)){
+                    foreach ($doors_non_existant as $doors_non_existant_id) {
+                      drupal_set_message('Building ID '.$doors_non_existant_id.' doesn\'t have any doors set.', 'error');
+                    }
+                  }
+                  $error = "Please verify that buildings exist and have doors in the CSV files.";
+                }
+              }
+            } else {
+              $error = sprintf("Invalid value in row %d", $csv_key);
+              break;
+            }
+          }
+        } else {
+          $error = sprintf("Rows %d has to many columns/values 1", $csv_key);
+          break;
+        }
+      }
+    } else {
+      $error = "Incorrect CSV format, column headers are named incorrectly or in the wrong order";
+    }
+  } else {
+    $error = "Incorrect CSV format, to many columns 2";
+  }
+
+  return array(false, $error);
+}
+
+function importDoors($csv){
+    $buildings = array();
+    foreach ($csv as $csv_key => $csv_array) {
+      if($csv_array[0] === "BID"){
+        continue;
+      }
+      if(empty($buildings[$csv_array[0]])){
+        $buildings[$csv_array[0]] = array();
+      }
+      array_push($buildings[$csv_array[0]], array($csv_array[1], $csv_array[2]));
+    }
+
+  //In order to keep things organized and clustered together in the database, an array is created for each building for organization purposes
+  foreach ($buildings as $bid => $door_array) {
+    // add door record
+    foreach ($door_array as $door) {
+      try {
+        db_insert('ptn_building_doors')
+          ->fields(array(
+            'bid' => t($bid),
+            'door_name' => t($door[0]),
+            'emails' => t($door[1])
+          ))
+          ->execute();
+      } catch (PDOException $e) {
+        drupal_set_message(t('Error: %message', array('%message' => $e->getMessage())), 'error');
+      }
+
+    }
+  }
+}
+
+function importBuildings($csv){
+  $buildings = array();
+  foreach ($csv as $csv_key => $csv_array) {
+    if($csv_array[0] === "BID"){
+      continue;
+    }
+    if(empty($buildings[$csv_array[0]])){
+      $buildings[$csv_array[0]] = array();
+    }
+    array_push($buildings[$csv_array[0]], array($csv_array[1], $csv_array[2]));
+  }
+
+  //In order to keep things organized and clustered together in the database, an array is created for each building for organization purposes
+  foreach ($buildings as $bid => $building_data) {
+    foreach ($building_data as $building) {
+      try {
+        db_insert('ptn_buildings')
+          ->fields(array(
+            'bid' => t($bid),
+            'building_name' => t($building[0]),
+            'elec_or_man' => t($building[1]),
+          ))
+          ->execute();
+      } catch (PDOException $e) {
+        drupal_set_message(t('Error: %message', array('%message' => $e->getMessage())), 'error');
+      }
+    }
+  }
+}
+
+/**
+ * Building/Door request management - edit one building
+ */
+function ptn_doors_edit_building($form, &$form_state, $bid) {
+
+  // function params
+  $form = array();
+  $building_record = null;
+
+  // load building record
+  $result = db_query('SELECT * FROM ptn_buildings WHERE bid = :bid', array(':bid' => t($bid)));
+  foreach ($result as $record) {
+    $building_record = $record;
+  }
+
+  // load door records
+  $door_list_html  = _ptn_doors_get_door_list($bid);
+
+  // build form
+  $form['utility_links'] = array(
+    '#markup' => _ptn_doors_get_utility_links()
+  );
+
+  $form['heading'] = array(
+    '#markup' => '<h1>Edit Building - ' . $building_record->building_name . '</h1>'
+  );
+
+  $form['bid'] = array(
+    '#type' => 'hidden',
+    '#value' => $building_record->bid
+  );
+
+  $form['building_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Building Name'),
+    '#size' => 25,
+    '#maxlength' => 100,
+    '#required' => TRUE,
+    '#description' => t('e.g. <em>2 DICKINSON ST</em>.'),
+    '#default_value' => $building_record->building_name,
+  );
+
+  $form['elec_or_man'] = array(
+    '#type' => 'select',
+    '#title' => t('Access Type'),
+    '#options' => array(
+      'ELEC' => t('Electric'),
+      'MAN' => t('Manual'),
+    ),
+    '#default_value' => $building_record->elec_or_man,
+  );
+
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Save Changes »'));
+  $form['#submit'][] = 'ptn_doors_edit_building_submit';
+
+  $form['door_list_spacer'] = array('#markup' => '<hr/><br/>');
+
+  // doors
+  $form['door_list_heading'] = array('#markup' => '<h2>Building Doors - ' . $building_record->building_name . '</h2>');
+  $form['door_list'] = array('#markup' => $door_list_html);
+
+  $form['door_new'] = array(
+    '#type' => 'textfield',
+    '#size' => 25,
+    '#maxlength' => 100,
+    '#default_value' => 'Name of Door to Add',
+    '#attributes' => array(
+        'onclick' => 'this.value="";'
+     ),
+  );
+
+  $form['door_add'] = array(
+    '#type' => 'submit',
+    '#value' => t('Add Door'),
+    '#submit' => array('ptn_doors_edit_building_door_add_submit'), // If no javascript action.
+    '#ajax' => array(
+      'callback' => 'ptn_doors_edit_building_door_list_js',
+      'wrapper' => 'door-list',
+      'method' => 'replace',
+      'effect' => 'fade',
+    ),
+  );
+
+  $form['remove_spacer'] = array('#markup' => '<hr/><br/>');
+
+  // remove building
+  $form['actions']['cancel'] = array(
+    '#type' => 'submit',
+    '#access' => TRUE,
+    '#value' => '[x] Remove Building',
+    '#weight' => 99,
+    '#submit' => array('ptn_doors_remove_building_submit'),
+    '#attributes' => array(
+        'class' => array('form-button-disabled'),
+        'onclick' => 'if(!confirm("Are you sure?  All building data will be removed.")){return false;}'
+     ),
+  );
+
+  // return
+  return $form;
+
+}
+
+/**
+ * For handling submission of building-editform
+ */
+function ptn_doors_edit_building_submit($form, &$form_state) {
+
+  // validate
+  if(empty($form_state['input']['bid'])) {
+    drupal_set_message('Could not read building ID', 'error');
+    return;
+  }
+
+  // parse form values
+  $bid = $form_state['input']['bid'];
+  $building_name = $form_state['input']['building_name'];
+  $elec_or_man = $form_state['input']['elec_or_man'];
+
+  // add record
+  $query = 'UPDATE ptn_buildings SET building_name = :building_name, elec_or_man = :elec_or_man WHERE bid = :bid';
+  db_query(
+    $query,
+    array(
+      ':building_name' => t($building_name),
+      ':elec_or_man' => t($elec_or_man),
+      ':bid' => t($bid),
+    )
+  );
+
+  drupal_set_message('Building "' . $building_name . '" has been updated.');
+  drupal_goto('admin/ptn_doors/main');
+
+}
+
+/**
+ * For handling building removal
+ */
+function ptn_doors_remove_building_submit($form, &$form_state) {
+
+  // validate
+  if(empty($form_state['input']['bid'])) {
+    drupal_set_message('Could not read building ID', 'error');
+    return;
+  }
+
+  // parse form values
+  $bid = $form_state['input']['bid'];
+
+  // remove requests
+  //...
+
+  // remove doors
+  $query = 'DELETE FROM ptn_building_doors WHERE bid = :bid';
+  db_query($query, array(':bid' => t($bid)));
+
+  // remove building
+  $query = 'DELETE FROM ptn_buildings WHERE bid = :bid';
+  db_query($query, array(':bid' => t($bid)));
+
+  // carry on
+  drupal_set_message('Building removed: ' . $form_state['input']['building_name']);
+  drupal_goto('admin/ptn_doors/main');
+
+}
+
+/**
+ * For dynamic updates of the door list on building edit form
+ */
+function ptn_doors_edit_building_door_list_js($form, $form_state) {
+
+  // validate
+  if(empty($form_state['input']['bid'])) {
+    drupal_set_message('Could not read building ID', 'error');
+    return "ERROR";
+  }
+
+  // parse form values
+  $bid = $form_state['input']['bid'];
+
+  // door list HTML
+  return _ptn_doors_get_door_list($bid);
+
+}
+
+/**
+ * For adding one email contact in the notification settings
+ */
+function ptn_doors_email_notification_add($form, $form_state) {
+
+  // validate
+  $wrapper = $form_state['triggering_element']['#ajax']['wrapper'];
+  $wrapper = explode('-', $wrapper);
+  $contact_type = $wrapper[2];
+  if(empty($contact_type)) {
+    drupal_set_message('Could not read contact type', 'error');
+    return "ERROR";
+  }
+
+  // read new contact
+  $contact_field = ('electric' == $contact_type) ? 'electric_new' : 'manual_new';
+  $new_contact = $form_state['input'][$contact_field];
+  if(empty($new_contact)) {
+    drupal_set_message('Could not read new contact email', 'error');
+    return "ERROR";
+  }
+
+  // add to list
+  $var_prefix = 'ptn_doors_contact_';
+  $var_name = $var_prefix . $contact_type;
+  $list = variable_get($var_name);
+  $new_list = (empty($list)) ? $new_contact : $list . '|' . $new_contact;
+  variable_set($var_name, $new_list);
+
+}
+
+
+/**
+ * For dynamic updates of a notification contact list
+ */
+function ptn_doors_email_notification_list_js($form, $form_state) {
+
+  // validate
+  $wrapper = $form_state['triggering_element']['#ajax']['wrapper'];
+  $wrapper = explode('-', $wrapper);
+  $contact_type = $wrapper[2];
+  if(empty($contact_type)) {
+    drupal_set_message('Could not read contact type', 'error');
+    return "ERROR";
+  }
+
+  // return list
+  return _ptn_doors_get_notification_contacts($contact_type);
+
+}
+
+/**
+ * For adding one door to a building
+ */
+function ptn_doors_edit_building_door_add_submit($form, $form_state) {
+
+  // validate
+  if(empty($form_state['input']['bid'])) {
+    drupal_set_message('Could not read building ID', 'error');
+    return;
+  }
+
+  // parse form values
+  $bid = $form_state['input']['bid'];
+  $door_name = $form_state['input']['door_new'];
+
+  // add door record
+  $query = 'INSERT INTO ptn_building_doors (bid, door_name) ';
+  $query .= 'VALUES (:bid, :door_name)';
+  db_query(
+    $query,
+    array(
+      ':bid' => t($bid),
+      ':door_name' => t($door_name),
+    )
+  );
+
+}
+
+/**
+ * Building/Door request management - remove one door
+ */
+function ptn_doors_remove_door($form, &$form_state, $did) {
+
+  // validate
+  if(empty($did)) {
+    drupal_set_message('Could not read door ID', 'error');
+    return;
+  }
+
+  // read door record
+  $door_record = null;
+  $result = db_query('SELECT * FROM ptn_building_doors WHERE did = :did', array(':did' => t($did)));
+  foreach ($result as $record) {
+    $door_record = $record;
+  }
+
+  if(!empty($door_record)) {
+
+    // remove door
+    $query = 'DELETE FROM ptn_building_doors WHERE did = :did';
+    db_query($query, array(':did' => t($did)));
+
+    drupal_set_message('Removed door: ' . $door_record->door_name);
+    drupal_goto('admin/ptn_doors/edit_building/' . $door_record->bid);
+
+
+  } else {
+    drupal_set_message('Door not found', 'warning');
+    return;
+  }
+
+}
+
+/**
+ * For reading list of door for a given building
+ */
+function _ptn_doors_get_door_list($bid) {
+
+  // load door records
+  $door_records = array();
+  $result = db_query('SELECT * FROM ptn_building_doors WHERE bid = :bid ORDER BY door_name', array(':bid' => t($bid)));
+  foreach ($result as $record) {
+    array_push($door_records, $record);
+  }
+
+  // door list HTML
+  $door_list_html = '<div id="door-list"><ul>';
+  foreach ($door_records as $one_door) {
+    $door_list_html .= '<li>' . $one_door->door_name . ' ';
+    $door_list_html .= '<a href="/admin/ptn_doors/remove_door/' . $one_door->did . '" onclick="if(!confirm(\'Are you sure?  All door data will be removed.\')){return false;}">[x]</a>';
+    $door_list_html .= '</li>';
+  }
+  $door_list_html .= '</ul></div>';
+
+  // no-results message
+  if (count($door_records) == 0) {
+    $door_list_html = '<div id="door-list">(no doors for this building)</div>';
+  }
+
+  // return
+  return $door_list_html;
+
+}
+
+/**
+ * For getting the list of building notification contacts
+ */
+function _ptn_doors_get_notification_contacts($contact_type) {
+  global $base_url;
+  // validate
+  if(empty($contact_type)) {
+    drupal_set_message('Missing contact type', 'error');
+    return "ERROR";
+  }
+
+  // build list html
+  $contact_list = ptn_doors_get_notification_emails($contact_type);
+  if (!empty($contact_list)) {
+    $contact_list_html = '<div id="contact-list-' . $contact_type . '"><ul>';
+    foreach ($contact_list as $one_contact) {
+      $contact_list_html .= '<li>' . $one_contact . ' ';
+      $contact_list_html .= '<a href="'.$base_url.'/admin/ptn_doors/remove_contact/' . $contact_type . '/' . urlencode($one_contact) . '" onclick="if(!confirm(\'Removing ' . $one_contact . ' from contact list.  Are you sure?\')){return false;}">[x]</a>';
+      $contact_list_html .= '</li>';
+    }
+    $contact_list_html .= '</ul></div>';
+
+  // empty list
+  } else {
+    $contact_list_html = '<div id="contact-list-' . $contact_type . '">(no contacts set)</div>';
+  }
+
+  // return
+  return $contact_list_html;
+
+}
+
+/**
+ * For removing a notification contact
+ */
+function ptn_doors_remove_contact($form, &$form_state, $contact_type, $contact_address) {
+
+  // validate
+  if(empty($contact_type) || empty($contact_address)) {
+    drupal_set_message('Missing contact type or address', 'error');
+    return;
+  }
+
+  // read list
+  $contact_address = urldecode($contact_address);
+  $contact_list = ptn_doors_get_notification_emails($contact_type);
+  if(($key = array_search($contact_address, $contact_list)) !== false) {
+    unset($contact_list[$key]);
+  }
+
+  // set new list
+  _ptn_doors_set_notification_emails($contact_type, $contact_list);
+
+  drupal_set_message('Removed contact: ' . $contact_address);
+  drupal_goto('admin/ptn_doors/notifications');
+
+}
+
+/**
+ * For getting an array of contacts, for the given notification type
+ */
+function ptn_doors_get_notification_emails($contact_type) {
+
+  // validate
+  if(empty($contact_type)) {
+    drupal_set_message('Missing contact type', 'error');
+    return;
+  }
+
+  // read contacts
+  $contact_list = array();
+  $var_prefix = 'ptn_doors_contact_';
+  $var_name = $var_prefix . $contact_type;
+  $list = variable_get($var_name);
+
+  // convert to array
+  if (strpos($list, '|') === false) {
+    $contact_list = (strlen($list) > 0) ? array($list) : array();
+  } else {
+    $contact_list = explode('|', $list);
+  }
+
+  // return
+  return $contact_list;
+
+}
+
+/**
+ * For updating a notification email list
+ */
+function _ptn_doors_set_notification_emails($contact_type, $contact_list) {
+
+  // validate
+  if(empty($contact_type)) {
+    drupal_set_message('Missing contact type', 'error');
+    return;
+  }
+
+  // set list
+  $var_prefix = 'ptn_doors_contact_';
+  $var_name = $var_prefix . $contact_type;
+  $new_list = implode('|', $contact_list);
+  variable_set($var_name, $new_list);
+
+}
+
+/**
+ * For display of the public door request form
+ */
+function ptn_doors_public_request_form($form, &$form_state) {
+
+  // logout url?
+$url = 'http://' . $_SERVER['SERVER_NAME'] . $_SERVER['REQUEST_URI'];
+
+if (false !== strpos($url,'logout')) {
+include_once('sites/all/libraries/CAS/CAS.php');
+phpCAS::client(CAS_VERSION_2_0,'fed.princeton.edu',443,'cas');
+phpCAS::setNoCasServerValidation();
+phpCAS::logout();
+}
+
+
+/*
+  if(empty($_SESSION['phpCAS']['user'])) {
+    _ptn_doors_check_auth();
+    drupal_access_denied();
+  }
+*/
+
+if (false !== strpos($url,'list')) {
+  global $user;
+
+  // Check to see if $user has the administrator role.
+  if (in_array('bac-admin', $user->roles) || in_array('administrator', $user->roles)) {
+$form['pre_text_table'] = array('#markup' => '<table width="100%"><thead><tr><th>E-mail</th><th>Status</th><th>View</th></tr></thead>');
+$form['pre_text_table_body'] = array('#markup' => '<tbody>');
+$result = db_query('SELECT * FROM field_data_field_door_requester_email ORDER BY `entity_id` DESC LIMIT 0,45');
+$countformpt = 1;
+foreach ($result as $record) {
+$buildingslistemail = $record->field_door_requester_email_value;
+$buildingslistrid = $record->entity_id;
+$resultaordnull = db_query("SELECT aord FROM ptn_building_approval_or_dissaproval WHERE bid = :bid", array(':bid' => $record->entity_id))->fetchField();
+if($resultaordnull == 1 && $resultaordnull !== 2){
+$form['pre_text_'.$countformpt++.''] = array('#markup' =>
+  '<tr><td>'.$buildingslistemail.'</td><td class="green">Approved</td><td><a href="'.$base_url.'/door-request-approve/'.$buildingslistrid.'">View</a></td></tr>'
+);
+} elseif($resultaordnull == 2 && $resultaordnull !== 1){
+$form['pre_text_'.$countformpt++.''] = array('#markup' =>
+  '<tr><td>'.$buildingslistemail.'</td><td class="red">Denied</td><td><a href="'.$base_url.'/door-request-approve/'.$buildingslistrid.'">View</a></td></tr>'
+);
+} else {
+$form['pre_text_'.$countformpt++.''] = array('#markup' =>
+  '<tr><td>'.$buildingslistemail.'</td><td class="yellow">Awaiting Response</td><td><a href="'.$base_url.'/door-request-approve/'.$buildingslistrid.'">View</a></td></tr>'
+);
+}
+}
+$form['pre_text_table_body_close'] = array('#markup' => '</tbody>');
+$form['pre_text_table_close'] = array('#markup' => '</table>');
+
+} else {
+$form['access_denied_text'] = array('#markup' => '<div class="denied">Access denied! You must be an administrator to access this page.</div>');
+}
+return $form;
+} else {
+//is authenticated?
+  // build form
+
+  // load building list
+  $buildings = array();
+  $buildings[''] = '-- Select A Building --';
+  $result = db_query('SELECT * FROM ptn_buildings ORDER BY building_name ASC');
+  foreach ($result as $record) {
+    $buildings[$record->bid] = $record->building_name;
+  }
+
+  // user vitals
+
+  $form['pre_text'] = array('#markup' =>
+      '<div class="row entry">
+<h2 class="row center">Door and Building Request Form</h2>
+<p>If this request requires the unlocking of building\'s electronically controlled "PROX" door. Please contact the appropriate Building Access Coordinator (BAC) and have them submit a building unlock schedule change to <a href="mailto:BACSDAFS@princeton.edu">BACSDAFS@princeton.edu</a></p>' .
+      '<p>Electronically controlled "PROX" doors WILL NOT be unlocked based on this form submission.</p>' .
+      '<p>Submit COMPLETED form 24 HOURS IN ADVANCE of the requested Lock/Unlock time to accommodate processing time for card access and manual opening of buildings and rooms.</p>' .
+      '<p>Last minute arrangements and/or changes for your request WILL NOT be guaranteed.</p>'.
+      '<p><div class="logout-cas"><b>You are logged into PAC</b> <a href="'.$url.'/logout">Logout</a></div></p></div>'
+  );
+
+  $form['requester_last_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Last Name'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => TRUE,
+  );
+
+  $form['requester_first_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('First Name'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => FALSE,
+  );
+
+  $form['requester_street_1'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Street Address 1'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => TRUE,
+  );
+
+  $form['requester_street_2'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Street Address 2'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => FALSE,
+  );
+
+  $form['requester_department'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Department'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => TRUE,
+  );
+
+  $form['requester_phone_primary'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Telephone (Primary)'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => TRUE,
+  );
+
+  $form['requester_phone_emergency'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Telephone (Emergency)'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => TRUE,
+  );
+
+  $form['requester_fax'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Fax'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => FALSE,
+  );
+
+  $form['requester_email'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Email'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => TRUE,
+  );
+
+  $form['requester_organization'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Organization\'s Name'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => TRUE,
+  );
+
+  $form['requester_status'] = array(
+    '#type' => 'radios',
+    '#title' => t('Status'),
+    '#default_value' => 'STUDENT',
+    '#options' => array('FACULTY' => 'Faculty', 'STAFF' => 'Staff', 'STUDENT' => 'Student'),
+    '#required' => true,
+  );
+
+  $form['status_fix'] = array('#markup' => '<div class="clr">');
+
+  $form['event_title'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Title of Event'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => TRUE,
+  );
+
+  $form['event_date'] = array(
+    '#type' => 'date_select',
+    '#title' => t('Event Date'),
+    '#default_value' => date('Y-m-d', (time() + (7*86400))),  // +1 week
+    '#date_year_range' => '0:+3',
+    '#date_format' => 'Y-m-d',
+    '#required' => true,
+  );
+
+  $form['event_start_time'] = array(
+    '#type' => 'date_select',
+    '#title' => t('Start Time'),
+    '#default_value' => date('Y-m-d', (time() + (7*86400))) . ' 17:00',  // +1 week
+    '#date_format' => 'g:i a',
+    '#required' => true,
+  );
+
+  $form['event_end_time'] = array(
+    '#type' => 'date_select',
+    '#title' => t('End Time'),
+    '#default_value' => date('Y-m-d', (time() + (7*86400))) . ' 19:00',  // +1 week
+    '#date_format' => 'g:i a',
+    '#required' => true,
+  );
+
+  $form['approved_reserved'] = array(
+    '#type' => 'radios',
+    '#title' => t('Is the location approved and reservation completed'),
+    '#default_value' => 'NO',
+    '#options' => array('NO' => 'No', 'YES' => 'Yes'),
+    '#required' => true,
+  );
+
+  $form['approved_reserved_fix'] = array('#markup' => '<div class="clr">');
+
+  $form['approved_by'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Approved By'),
+    '#size' => 10,
+    '#maxlength' => 25,
+    '#required' => TRUE,
+  );
+
+  $form['unlock_time'] = array(
+    '#type' => 'date_select',
+    '#title' => t('Desired Time to Unlock'),
+    '#default_value' => date('Y-m-d', (time() + (7*86400))) . ' 16:30',  // +1 week
+    '#date_format' => 'g:i a',
+    '#required' => true,
+  );
+
+  $form['lock_time'] = array(
+    '#type' => 'date_select',
+    '#title' => t('Desired Time to Lock'),
+    '#default_value' => date('Y-m-d', (time() + (7*86400))) . ' 19:30',  // +1 week
+    '#date_format' => 'g:i a',
+    '#required' => true,
+  );
+
+  $form['requester_comments'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Brief summary of why you need this lock/unlock request'),
+    '#default_value' => '',
+    '#cols' => 60,
+    '#rows' => 5,
+    '#required' => true,
+  );
+
+  $form['comments_fix'] = array('#markup' => '<div class="clr">');
+
+  $form['post_text'] = array('#markup' =>
+      '<p>CANCELLATION POLICY: In the event of a cancellation, you must notify The Department of Public Safety at 609-258-1000 within 4 hours of the start of the event.</p>' .
+      '<p>LAST MINUTE ARRANGEMENTS AND/OR CHANGES FOR YOUR REQUEST WILL NOT BE GUARANTEED!!!</p>'
+  );
+
+  // building wrapper
+
+  $form['buildings_wrapper'] = array('#prefix' => '<div id="buildings-wrapper">', '#suffix' => '</div>');
+
+  // building count
+  $building_max = 5;
+  $building_max_reached = FALSE;
+  if(isset($form_state['storage']['building_count'])) {
+    $building_count = $form_state['storage']['building_count'];
+  } else {
+    $building_count = 1;
+    $form_state['storage']['building_count'] = $building_count;
+  }
+
+  // display buildings
+  for($i=1; $i<=$building_count; $i++) {
+
+    // cap building list at 5
+    if ($i > $building_max) {
+      $form['buildings_wrapper']['building_spacer_' . $i] = array('#markup' => '<br/><br/><p><strong>(limit ' . $building_max . ' buildings)</strong></p>');
+      $building_max_reached = TRUE;
+      continue;
+    }
+
+    // spacer
+    $form['buildings_wrapper']['building_spacer_' . $i] = array('#markup' => '<strong>Building ' . $i . '</strong><hr/>');
+
+    // building selector
+    $form['buildings_wrapper']['building_id_' . $i] = array(
+      '#type' => 'select',
+      '#title' => t('Please select a building you are requesting access to'),
+      '#required' => TRUE,
+      '#options' => $buildings,
+      '#ajax' => array(
+        'event' => 'change',
+        'wrapper' => 'door-wrapper-' . $i,
+        'callback' => 'ptn_doors_update_door_list',
+        'method' => 'replace',
+      ),
+    );
+
+    // door selector
+    $form['buildings_wrapper']['door_wrapper_' . $i] = array('#prefix' => '<div id="door-wrapper-' . $i . '">', '#suffix' => '</div>');
+
+    // add doors for building, if selected
+    if(!empty($form_state['input']['building_id_' . $i])) {
+
+      // exterior doors
+      $bid_for_doors = $form_state['input']['building_id_' . $i];
+      $door_cb_list = '<label for="door-wrapper-' . $i . '">Please Select which Doors You Need Access To For This Building</label>';
+      $door_count = 0;
+      $result = db_query('SELECT * FROM ptn_building_doors WHERE bid = :bid ORDER BY door_name', array(':bid' => t($bid_for_doors)));
+      foreach ($result as $record) {
+        $checked_value = (isset($form_state['input']['edit-did-' . $i . '-' . $record->did])) ? 'CHECKED' : '';
+        $door_cb_list .= '<input type="checkbox" name="edit-did-' . $i . '-' . $record->did . '" value="SELECTED" ' . $checked_value . '> ' . $record->door_name .'';
+        $door_count++;
+      }
+      if ($door_count == 0) $door_cb_list .= "<p>(none available)</p>";
+      $form['buildings_wrapper']['door_wrapper_' . $i]['exterior_' . $i] = array('#markup' => $door_cb_list);
+
+      // interior doors
+      $form['buildings_wrapper']['door_wrapper_' . $i]['interior_' . $i] = array(
+        '#type' => 'textfield',
+        '#title' => t('Please List All Interior Room Numbers You Need Access To'),
+        '#size' => 10,
+        '#maxlength' => 250,
+      );
+
+    }
+
+    if(!$building_max_reached && $i == $building_count) {
+      $form['buildings_wrapper']['door_wrapper_' . $i]['add_spacer_1'] = array('#markup' => '');
+      $form['buildings_wrapper']['door_wrapper_' . $i]['add_more'] = array(
+        '#type' => 'submit',
+        '#submit' => array('ptn_doors_public_request_add_building_submit'),
+        '#value' => t('[+] Add Another Building'),
+        '#ajax' => array(
+          'callback' => 'ptn_doors_public_request_add_building',
+          'wrapper' => 'buildings-wrapper',
+          'method' => 'replace',
+          'effect' => 'fade',
+        ),
+      );
+      $form['buildings_wrapper']['door_wrapper_' . $i]['add_spacer_2'] = array('#markup' => '');
+    }
+
+  }
+    if($building_count > 1) {
+  $form['buildings_wrapper']['door_wrapper_' . $i]['add_spacer_1'] = array('#markup' => '');
+      $form['buildings_wrapper']['door_wrapper_' . $i]['add_more'] = array(
+        '#type' => 'submit',
+        "#limit_validation_errors" => array(),
+        '#submit' => array('ptn_doors_public_request_remove_building_submit'),
+        '#value' => t('[-] Remove Building'),
+	    '#attributes' => array(
+        'class' => array('remove'),
+     ),
+        '#ajax' => array(
+          'callback' => 'ptn_doors_public_request_remove_building',
+          'wrapper' => 'buildings-wrapper',
+          'method' => 'replace',
+          'effect' => 'fade',
+        ),
+      );
+      $form['buildings_wrapper']['door_wrapper_' . $i]['add_spacer_2'] = array('#markup' => '');
+    }
+
+
+  // submit
+
+  $form['submit_spacer'] = array('#markup' => '<br/><br/><hr/><br/><br/>');
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Submit Access Request'));
+  $form['bottom_spacer'] = array('#markup' => '<br/><br/><br/>');
+  $form['#submit'][] = 'ptn_doors_public_request_submit';
+
+  // return
+  return $form;
+  }
+}
+
+/**
+ * For ajax refresh of the door list on public request form, once a building has been selected
+ */
+function ptn_doors_update_door_list($form, $form_state) {
+
+  // read building list ID
+  $building_list_name = $form_state['triggering_element']['#array_parents'][1];
+  $building_list_name_parts = explode('_', $building_list_name);
+  $building_list_id = $building_list_name_parts[2];
+
+  // return
+  return $form['buildings_wrapper']['door_wrapper_' . $building_list_id];
+
+}
+
+/**
+ * For ajax add of another building section, on the public door request form
+ */
+function ptn_doors_public_request_add_building($form, $form_state) {
+  return $form['buildings_wrapper'];
+}
+
+function ptn_doors_public_request_remove_building($form, $form_state) {
+  return $form['buildings_wrapper'];
+}
+
+/**
+ * submit handler for ptn_doors_public_request_add_building
+ */
+function ptn_doors_public_request_add_building_submit($form, &$form_state) {
+  $form_state['storage']['building_count']++;
+  $form_state['rebuild'] = TRUE;
+}
+function ptn_doors_public_request_remove_building_submit($form, &$form_state) {
+  $form_state['storage']['building_count']--;
+  $form_state['rebuild'] = TRUE;
+}
+
+/**
+ * For handling submission of a door request form
+ */
+function ptn_doors_public_request_submit($form, &$form_state) {
+
+  global $base_url;
+
+  // read overall request info
+  $requester_last_name = $form_state['input']['requester_last_name'];
+  $requester_first_name = $form_state['input']['requester_first_name'];
+  $requester_street_1 = $form_state['input']['requester_street_1'];
+  $requester_street_2 = $form_state['input']['requester_street_2'];
+  $requester_department = $form_state['input']['requester_department'];
+  $requester_phone_primary = $form_state['input']['requester_phone_primary'];
+  $requester_phone_emergency = $form_state['input']['requester_phone_emergency'];
+  $requester_fax = $form_state['input']['requester_fax'];
+  $requester_email = $form_state['input']['requester_email'];
+  $requester_organization = $form_state['input']['requester_organization'];
+  $requester_status = $form_state['input']['requester_status'];
+  $event_title = $form_state['input']['event_title'];
+  $event_date =
+    $form_state['input']['event_date']['month'] . '/' .
+    $form_state['input']['event_date']['day'] . '/' .
+    $form_state['input']['event_date']['year'];
+  $event_start_time =
+    $form_state['input']['event_start_time']['hour'] . ':' .
+    $form_state['input']['event_start_time']['minute'] . ' ' .
+    $form_state['input']['event_start_time']['ampm'];
+  $event_end_time =
+    $form_state['input']['event_end_time']['hour'] . ':' .
+    $form_state['input']['event_end_time']['minute'] . ' ' .
+    $form_state['input']['event_end_time']['ampm'];
+  $approved_reserved = $form_state['input']['approved_reserved'];
+  $approved_by = $form_state['input']['approved_by'];
+  $unlock_time =
+    $form_state['input']['unlock_time']['hour'] . ':' .
+    $form_state['input']['unlock_time']['minute'] . ' ' .
+    $form_state['input']['unlock_time']['ampm'];
+  $lock_time =
+    $form_state['input']['lock_time']['hour'] . ':' .
+    $form_state['input']['lock_time']['minute'] . ' ' .
+    $form_state['input']['lock_time']['ampm'];
+  $requester_comments = t($form_state['input']['requester_comments']);
+
+  // loop over building requests
+  $requests = array();
+  $has_more_buildings = TRUE;
+  $building_counter = 1;
+  while($has_more_buildings == TRUE) {
+
+    // parse building info
+    $building_id = $form_state['input']['building_id_' . $building_counter];
+    $interior_doors = t($form_state['input']['interior_' . $building_counter]);
+    $exterior_doors = array();
+    foreach($form_state['input'] as $key => $val) {
+      if(strstr($key, 'edit-did-' . $building_counter . '-')) {
+        $door_field_parts = explode('-', $key);
+        if(!empty($door_field_parts[3])) {
+          $door_id = $door_field_parts[3];
+          array_push($exterior_doors, $door_id);
+        }
+      }
+    }
+    $request_detail_data = $building_id . '|';
+    $request_detail_data .= implode(',', $exterior_doors) . '|';
+    $request_detail_data .= $interior_doors;
+
+    // save request node
+    $node = new stdClass();
+    $node->type = "door_request";
+    $node->title = "DOORS - " . $event_date . ' (' . $requester_email . ')';
+    $node->language = LANGUAGE_NONE;
+    $node->uid = 1;
+    node_object_prepare($node);
+    $node->body[$node->language][0]['value'] = $requester_comments;
+    $node->field_door_requester_last_name[$node->language][0]['value'] = $requester_last_name;
+    $node->field_door_requester_first_name[$node->language][0]['value'] = $requester_first_name;
+    $node->field_door_requester_street_1[$node->language][0]['value'] = $requester_street_1;
+    $node->field_door_requester_street_2[$node->language][0]['value'] = $requester_street_2;
+    $node->field_door_requester_department[$node->language][0]['value'] = $requester_department;
+    $node->field_door_requester_phone_pri[$node->language][0]['value'] = $requester_phone_primary;
+    $node->field_door_requester_phone_emer[$node->language][0]['value'] = $requester_phone_emergency;
+    $node->field_door_requester_fax[$node->language][0]['value'] = $requester_fax;
+    $node->field_door_requester_email[$node->language][0]['value'] = $requester_email;
+    $node->field_door_requester_org[$node->language][0]['value'] = $requester_organization;
+    $node->field_door_requester_status[$node->language][0]['value'] = $requester_status;
+    $node->field_door_event_title[$node->language][0]['value'] = $event_title;
+    $node->field_door_event_date[$node->language][0]['value'] = $event_date;
+    $node->field_door_event_start_time[$node->language][0]['value'] = $event_start_time;
+    $node->field_door_event_end_time[$node->language][0]['value'] = $event_end_time;
+    $node->field_door_approved_reserved[$node->language][0]['value'] = $approved_reserved;
+    $node->field_door_approved_by[$node->language][0]['value'] = $approved_by;
+    $node->field_door_unlock_time[$node->language][0]['value'] = $unlock_time;
+    $node->field_door_lock_time[$node->language][0]['value'] = $lock_time;
+            //...
+    $node->field_door_request_data[$node->language][0]['value'] = $request_detail_data;
+    $node->field_door_request_status[$node->language][0]['value'] = 'NEW';
+    $node = node_submit($node);
+    node_save($node);
+    array_push($requests, $node);
+
+    // load building record
+    $building_record = NULL;
+    $result = db_query('SELECT * FROM ptn_buildings WHERE bid = :bid', array(':bid' => $building_id));
+    foreach ($result as $record) {
+      $building_record = $record;
+    }
+    if(empty($building_record->bid)) {
+      drupal_set_message('Could not read building record for notifications.', 'error');
+      drupal_goto('door-request');
+      return;
+    }
+
+    $this_request_url = $base_url.'/door-request-approve/' . $node->nid;
+
+    // send bac/daf email notification
+    if('ELEC' == $building_record->elec_or_man) {
+      $elec_man_contact_array = ptn_doors_get_notification_emails("electric");
+    } elseif('MAN' == $building_record->elec_or_man) {
+      $elec_man_contact_array = ptn_doors_get_notification_emails("manual");
+    }
+
+    foreach ($elec_man_contact_array as $elec_man_contact) {
+
+    global $base_url;
+    $subject = 'Door Request';
+ $body = '<style>
+*{box-sizing:border-box;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;}
+body {font-family:"Arial",Verdana;font-size:13px;line-height:18px;color:#5f5e5e;background:#f2f4f7;text-align:center;}
+body p {margin: 13px 0;}
+body a {color:#5f5e5e;text-decoration:none;}
+body .message {background:#fff;width:580px;margin:90px auto 30px auto;}
+body .message .header {display:table;width:100%;padding:12px;}
+body .message .header .header-image {float:left;padding: 0 0 10px;}
+body .message .alert {background:#ee7f2d;background:#ee7f2d;background-image:-webkit-linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  background-image:linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  -webkit-background-size:60px 60px;
+  background-size:60px 60px; height:64px;line-height:64px;text-align:center;color:#fff;font-size:22px;padding:0 10px;letter-spacing:1px;}
+body .message .text {padding:50px 10px;font-weight:bold;}
+body .message .decide {padding:0 0 50px;}
+body .message .decide a.button {display:block;text-decoration:none;width:250px;margin:0 auto;background:#3e3e3e;color:#fff;border-radius:5px;-moz-border-radius:5px;-webkit-border-radius:5px;padding:20px;font-size:22px;}
+body .message .link {padding:0 0 40px;}
+body .copyright {color:#8f8f8f;text-align:center;font-size:11px;padding: 0 0 50px 0;}
+</style>
+
+<div class="message">
+  <div class="header">
+      <div class="header-image"><a href="' .$base_url .'"><img src="'.$base_url.'/images/logo.png" width="224" height="65"/></a></div>
+    </div>
+    <div class="alert">
+      New Building Access Request. Action Required
+    </div>
+  <div class="text">
+      <p>To Authorized BAC Admin</p>
+    <p>A request has been filled out for building access by '.$requester_email.'<br/>on '.date("F j, Y, g:i a").'.</p>
+    <p>Please follow the link below to Approve or Deny this request.</p>
+    </div>
+    <div class="decide"><a class="button" href="'.$this_request_url.'">View Request Here</a></div>
+    <div class="link">Or copy and paste the following link into your browser:<br/>'.$this_request_url.'</div>
+</div>
+
+<div class="copyright">&copy;2013 The Trustees of <a href="http://www.princeton.edu">Princeton University</a> &middot; Princeton, New Jersey 08544 USA</div>';
+      ptn_doors_custom_mail(NULL, $elec_man_contact, $subject, $body);
+  }
+
+
+
+    // more buildings?
+    $building_counter++;
+    if(!isset($form_state['input']['building_id_' . $building_counter])) {
+      $has_more_buildings = FALSE;
+      continue;
+    }
+
+  }
+
+  // continue to confirmation page
+  drupal_goto('door-request-confirm');
+
+}
+
+/**
+ * For display of the door request approve/deny form
+ */
+function ptn_doors_request_approval_form($form, &$form_state, $request_nid) {
+  global $user;
+
+  // Check to see if $user has the administrator role.
+  if (in_array('bac-admin', $user->roles) || in_array('administrator', $user->roles)) {
+
+ /*
+  // authorized?
+  if(empty($_SESSION['phpCAS']['user'])) {
+    _ptn_doors_check_auth();
+    drupal_access_denied();
+  }  // load request node
+  */
+  $request_node = node_load($request_nid);
+  if(empty($request_node->nid) || 'door_request' != $request_node->type) {
+    echo "bad request id";
+    die;
+  }
+  $requester_comments = $request_node->body[LANGUAGE_NONE][0]['value'];
+  $requester_last_name = $request_node->field_door_requester_last_name[LANGUAGE_NONE][0]['value'];
+  $requester_first_name = $request_node->field_door_requester_first_name[LANGUAGE_NONE][0]['value'];
+  $requester_street_1 = $request_node->field_door_requester_street_1[LANGUAGE_NONE][0]['value'];
+  $requester_street_2 = $request_node->field_door_requester_street_2[LANGUAGE_NONE][0]['value'];
+  $requester_department = $request_node->field_door_requester_department[LANGUAGE_NONE][0]['value'];
+  $requester_phone_primary = $request_node->field_door_requester_phone_pri[LANGUAGE_NONE][0]['value'];
+  $requester_phone_emergency = $request_node->field_door_requester_phone_emer[LANGUAGE_NONE][0]['value'];
+  $requester_fax = $request_node->field_door_requester_fax[LANGUAGE_NONE][0]['value'];
+  $requester_email = $request_node->field_door_requester_email[LANGUAGE_NONE][0]['value'];
+  $requester_organization = $request_node->field_door_requester_org[LANGUAGE_NONE][0]['value'];
+  $requester_status = $request_node->field_door_requester_status[LANGUAGE_NONE][0]['value'];
+  $event_title = $request_node->field_door_event_title[LANGUAGE_NONE][0]['value'];
+  $event_date = $request_node->field_door_event_date[LANGUAGE_NONE][0]['value'];
+  $event_start_time = $request_node->field_door_event_start_time[LANGUAGE_NONE][0]['value'];
+  $event_end_time = $request_node->field_door_event_end_time[LANGUAGE_NONE][0]['value'];
+  $approved_reserved = $request_node->field_door_approved_reserved[LANGUAGE_NONE][0]['value'];
+  $approved_by = $request_node->field_door_approved_by[LANGUAGE_NONE][0]['value'];
+  $unlock_time = $request_node->field_door_unlock_time[LANGUAGE_NONE][0]['value'];
+  $lock_time = $request_node->field_door_lock_time[LANGUAGE_NONE][0]['value'];
+
+  // parse door request data
+  $door_data = $request_node->field_door_request_data[LANGUAGE_NONE][0]['value'];
+  $door_data_parts = explode('|', $door_data);
+  $building_id = $door_data_parts[0];
+  $exterior_doors = (count($door_data_parts) > 1) ? $door_data_parts[1] : '';
+  $interior_doors = (count($door_data_parts) == 3) ? $door_data_parts[2] : '';
+
+  // load building info
+  $building_record = NULL;
+  $result = db_query('SELECT * FROM ptn_buildings WHERE bid = :bid', array(':bid' => $building_id));
+  foreach ($result as $record) {
+    $building_record = $record;
+  }
+  if(empty($building_record->building_name)) {
+    echo "Could not read building info";
+    die;
+  }
+
+  // load door info
+  $exterior_door_records = array();
+  if(!empty($exterior_doors)) {
+    $result = db_query('SELECT * FROM ptn_building_doors WHERE did IN (' . t($exterior_doors) . ')');
+    foreach ($result as $record) {
+      array_push($exterior_door_records, $record);
+    }
+  }
+
+  // build form
+
+  $form = array();
+
+  // request record ID
+  $form['request_nid'] = array(
+    '#type' => 'hidden',
+    '#value' => $request_node->nid
+  );
+
+  $form['request_wrapper'] = array('#markup' => '<ul class="request-wrapper">');
+  // request from
+  $form['requester_id'] = array(
+    '#markup' => '<li><span class="label">Request from</span><span class="text">' . $requester_first_name . ' ' . $requester_last_name . ' - ' . $requester_email . '</span></li>',
+  );
+
+  // requester phone
+  $requester_fax_display = (empty($requester_fax)) ? '' : '(Fax: ' . $requester_fax . ')';
+  $form['requester_phone'] = array(
+    '#markup' => '<li><span class="label">Requester Phone</span><span class="text">' . $requester_phone_primary . ' (Emergency: ' . $requester_phone_emergency .') ' . $requester_fax_display . '</span></li>',
+  );
+
+  // requester address
+  $form['requester_address'] = array(
+    '#markup' => '<li><span class="label">Requester Address</span><span class="text">' . $requester_street_1 . ' ' . $requester_street_2 . '</span></li>',
+  );
+
+  // requester status
+  $form['requester_status'] = array(
+    '#markup' => '<li><span class="label">Requester Status</span><span class="text">' . $requester_status . '</span></li>',
+  );
+
+  // department
+  $form['requester_department'] = array(
+    '#markup' => '<li><span class="label">Department</span><span class="text">' . $requester_department . '</span></li>',
+  );
+
+  // organization
+  $form['requester_organization'] = array(
+    '#markup' => '<li><span class="label">Organization</span><span class="text">' . $requester_organization . '</span></li>',
+  );
+
+  // approval
+  $form['requester_approval'] = array(
+    '#markup' => '<li><span class="label">Approved and Reserved</span><span class="text">' . $approved_reserved . ' (approved by: ' . $approved_by . ')</span></li>',
+  );
+
+  // event name
+  $form['event_name'] = array(
+    '#markup' => '<li><span class="label">Event</span><span class="text">' . $event_title . '</span></li>',
+  );
+
+  // event date/time
+  $form['event_date'] = array(
+    '#markup' => '<li><span class="label">Event Date</span><span class="text">' . $event_date . '</span></li>',
+  );
+
+  // event start/end
+  $form['event_start_end'] = array(
+    '#markup' => '<li><span class="label">Start/End</span><span class="text">' . $event_start_time . ' - ' . $event_end_time . '</span></li>',
+  );
+
+  // lock/unlock
+  $form['event_lock_unlock'] = array(
+    '#markup' => '<li><span class="label">Unlock At / Lock At</span><span class="text">' . $unlock_time . ' - ' . $lock_time . '</span></li>',
+  );
+
+
+  if($requester_comments) {
+    $form['requester_comments'] = array(
+      '#markup' => '<li><span class="label">Comments</span><span class="text">' . $requester_comments . '</span></li>',
+    );
+  }
+
+
+  // building requested
+  $form['building_requested'] = array(
+    '#markup' => '<li><span class="label">Building Requested</span><span class="text">' . $building_record->building_name . '</span></li>',
+  );
+
+
+  // exterior doors
+  $exterior_list_html = '';
+  foreach ($exterior_door_records as $one_exterior_door) {
+    $exterior_list_html .= '<li>' . $one_exterior_door->door_name . '</li>';
+  }
+  rtrim($exterior_list_html, ',');
+  $form['exterior_doors'] = array(
+    '#markup' => '<li><span class="label">Exterior Doors</span><span class="text">' . $exterior_list_html . '</span></li>',
+  );
+
+  // interior doors
+  $form['interior_doors'] = array(
+    '#markup' => '<li><span class="label">Interior Doors</span><span class="text">' . $interior_doors . '</span></li>',
+  );
+  $form['request_wrapper2'] = array(
+    '#markup' => '</ul>',
+  );
+
+
+  $result = db_query("SELECT aord FROM ptn_building_approval_or_dissaproval WHERE bid = :bid", array(':bid' => $request_node->nid))->fetchField();
+
+  if (empty($result)){
+   // approval comments
+
+
+  $form['approval_comments'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Admin remarks'),
+    '#description' => t('These comments will be mentioned in the email to the requestor'),
+    '#default_value' => '',
+    '#cols' => 60,
+    '#rows' => 5,
+  );
+ // submit
+  $form['approve_fix'] = array('#markup' => '<div class="approve-wrapper">');
+  $form['approve_fix2'] = array('#markup' => '<h5>Action required. Approve or deny this request</h5>');
+
+  $form['approve'] = array(
+    '#type' => 'submit',
+    '#access' => TRUE,
+    '#value' => 'APPROVE',
+    '#submit' => array('ptn_doors_approve_request_submit'),
+  );
+
+  $form['deny'] = array(
+    '#type' => 'submit',
+    '#access' => TRUE,
+    '#value' => 'DENY',
+    '#submit' => array('ptn_doors_deny_request_submit'),
+    '#attributes' => array(
+        'onclick' => 'if(!confirm("Deny this request?")){return false;}'
+     ),
+  );
+  }
+  if($result == 1){
+      $form['approved_already'] = array('#markup' => '<div class="approve-wrapper"><h5>This request has been <span class="green">approved</span> by an admin</h5>');
+      $form['reset'] = array(
+    '#type' => 'submit',
+    '#access' => TRUE,
+    '#value' => 'RESET',
+    '#submit' => array('ptn_doors_reset_request_submit'),
+    '#attributes' => array(
+        'onclick' => 'if(!confirm("Reset this request? Admin must approve or decline again.")){return false;}'
+     ),
+  );
+  $form['approve_wrapper'] = array('#markup' => '</div>');
+  }
+  if ($result == 2){
+      $form['denied_already'] = array('#markup' => '<div class="approve-wrapper"><h5>This request has been <span class="red">denied</span> by an admin</h5>');
+      $form['reset'] = array(
+    '#type' => 'submit',
+    '#access' => TRUE,
+    '#value' => 'RESET',
+    '#submit' => array('ptn_doors_reset_request_submit'),
+    '#attributes' => array(
+        'onclick' => 'if(!confirm("Reset this request? Admin must approve or decline again.")){return false;}'
+     ),
+
+  );
+    $form['approve_wrapper'] = array('#markup' => '</div>');
+}
+  } else {
+    drupal_access_denied();
+  }
+    return $form;
+}
+
+/**
+ * For handling approval of a door request form
+ */
+function ptn_doors_approve_request_submit($form, &$form_state) {
+
+  /*
+  // authorized?
+  if(empty($_SESSION['phpCAS']['user'])) {
+    _ptn_doors_check_auth();
+    drupal_access_denied();
+  }
+  */
+
+  // read form params
+  $request_nid = $form_state['input']['request_nid'];
+  $approval_comments = t($form_state['input']['approval_comments']);
+
+  // load request node
+  $request_node = node_load($request_nid);
+  if(empty($request_node->nid) || 'door_request' != $request_node->type) {
+    echo "bad request id";
+    die;
+  }
+  $approved = "1";
+    $query = 'INSERT INTO ptn_building_approval_or_dissaproval (bid, aord) ';
+  $query .= 'VALUES (:bid, :aord)';
+  db_query(
+    $query,
+    array(
+      ':bid' => t($request_nid),
+      ':aord' => t($approved),
+    )
+  );
+
+  $requester_email = $request_node->field_door_requester_email[LANGUAGE_NONE][0]['value'];
+  $access_date = $request_node->field_door_event_date[LANGUAGE_NONE][0]['value'];
+  $requester_comments = $request_node->body[LANGUAGE_NONE][0]['value'];
+  $requester_last_name = $request_node->field_door_requester_last_name[LANGUAGE_NONE][0]['value'];
+  $requester_first_name = $request_node->field_door_requester_first_name[LANGUAGE_NONE][0]['value'];
+  $requester_street_1 = $request_node->field_door_requester_street_1[LANGUAGE_NONE][0]['value'];
+  $requester_street_2 = $request_node->field_door_requester_street_2[LANGUAGE_NONE][0]['value'];
+  $requester_department = $request_node->field_door_requester_department[LANGUAGE_NONE][0]['value'];
+  $requester_phone_primary = $request_node->field_door_requester_phone_pri[LANGUAGE_NONE][0]['value'];
+  $requester_phone_emergency = $request_node->field_door_requester_phone_emer[LANGUAGE_NONE][0]['value'];
+  $requester_fax = $request_node->field_door_requester_fax[LANGUAGE_NONE][0]['value'];
+  $requester_email = $request_node->field_door_requester_email[LANGUAGE_NONE][0]['value'];
+  $requester_organization = $request_node->field_door_requester_org[LANGUAGE_NONE][0]['value'];
+  $requester_status = $request_node->field_door_requester_status[LANGUAGE_NONE][0]['value'];
+  $event_title = $request_node->field_door_event_title[LANGUAGE_NONE][0]['value'];
+  $event_date = $request_node->field_door_event_date[LANGUAGE_NONE][0]['value'];
+  $event_start_time = $request_node->field_door_event_start_time[LANGUAGE_NONE][0]['value'];
+  $event_end_time = $request_node->field_door_event_end_time[LANGUAGE_NONE][0]['value'];
+  $approved_reserved = $request_node->field_door_approved_reserved[LANGUAGE_NONE][0]['value'];
+  $approved_by = $request_node->field_door_approved_by[LANGUAGE_NONE][0]['value'];
+  $unlock_time = $request_node->field_door_unlock_time[LANGUAGE_NONE][0]['value'];
+  $lock_time = $request_node->field_door_lock_time[LANGUAGE_NONE][0]['value'];
+
+  // parse door request data
+  $door_data = $request_node->field_door_request_data[LANGUAGE_NONE][0]['value'];
+  $door_data_parts = explode('|', $door_data);
+  $building_id = $door_data_parts[0];
+  $exterior_doors = (count($door_data_parts) > 1) ? $door_data_parts[1] : '';
+  $interior_doors = (count($door_data_parts) == 3) ? $door_data_parts[2] : '';
+
+  // load building info
+  $building_record = NULL;
+  $result = db_query('SELECT * FROM ptn_buildings WHERE bid = :bid', array(':bid' => $building_id));
+  foreach ($result as $record) {
+    $building_record = $record;
+  }
+  if(empty($building_record->building_name)) {
+    echo "Could not read building info";
+    die;
+  }
+
+  // load door info
+  $exterior_door_records = array();
+  if(!empty($exterior_doors)) {
+    $result = db_query('SELECT * FROM ptn_building_doors WHERE did IN (' . t($exterior_doors) . ')');
+    foreach ($result as $record) {
+      array_push($exterior_door_records, $record);
+    }
+  }
+  // build request details text
+  $request_details = '';
+  foreach ($exterior_door_records as $one_exterior_door) {
+    $request_details .= $one_exterior_door->door_name . ',';
+  }
+  rtrim($request_details, ',');
+
+  // update request record
+  $request_node->field_door_request_status[LANGUAGE_NONE][0]['value'] = 'APPROVED';
+  $request_node->field_door_approval_comments[LANGUAGE_NONE][0]['value'] = $approval_comments;
+  node_save($request_node);
+
+  // notify manual/electric
+  $elec_man_contact_list = NULL;
+  if('ELEC' == $building_record->elec_or_man) {
+    $elec_man_contact_list = variable_get('ptn_doors_contact_electric');
+  } elseif('MAN' == $building_record->elec_or_man) {
+    $elec_man_contact_list = variable_get('ptn_doors_contact_manual');
+  }
+
+  if(!empty($elec_man_contact_list)) {
+    $recipients = explode('|', $elec_man_contact_list);
+    global $base_url;
+    foreach($recipients as $one_recipient) {
+      $subject = 'Building Access Request Notification';
+        $body = '<style>
+*{box-sizing:border-box;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;}
+body {font-family:"Arial",Verdana;font-size:13px;line-height:18px;color:#5f5e5e;background:#f2f4f7;text-align:center;}
+body p {margin: 13px 0;}
+body a {color:#5f5e5e;text-decoration:none;}
+body ul, body li {margin:0;padding:0;list-style:none;}
+body .message {background:#fff;width:580px;margin:90px auto 30px auto;}
+body .message .header {display:table;width:100%;padding:12px;}
+body .message .header .header-image {float:left;padding: 0 0 10px;}
+body .message .alert {background:#ee7f2d;background:#ee7f2d;background-image:-webkit-linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  background-image:linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  -webkit-background-size:60px 60px;
+  background-size:60px 60px; height:64px;line-height:64px;text-align:center;color:#fff;font-size:22px;padding:0 10px;letter-spacing:1px;}
+  body .message .text {padding: 50px 40px 25px;font-weight: bold;}
+
+body .message .green {color:#00b611;}
+body .message .red {color:#e42615;}
+
+body .message .data {padding:0 40px;}
+body .message .data ul li.dark {background:#f2f4f7;height:37px;line-height:37px;padding:0 10px;}
+body .message .data ul li.light {background:#f8f9fa;height:37px;line-height:37px;padding:0 10px;}
+body .message .data ul li span.left {float:left;font-weight:bold;}
+body .message .data ul li span.right {float:right;}
+
+body .message .link {padding:0 0 50px;font-weight:bold;}
+body .message .cancel {padding:0 0 40px;font-weight:bold;}
+
+
+body .copyright {color:#8f8f8f;text-align:center;font-size:11px;padding: 0 0 50px 0;}
+</style>
+
+<div class="message">
+  <div class="header">
+      <div class="header-image"><a href="'.$base_url .'"><img src="'.$base_url.'/images/logo.png" width="224" height="65"/></a></div>
+    </div>
+    <div class="alert">
+      Building Access Request Notification
+    </div>
+  <div class="text">
+      <p>A request has been <span class="green">APPROVED</span> by the designated BAC administrator for these buildings. Below lists the requested building access</p>
+    </div>
+
+    <div class="data">
+      <ul>
+        <li class="dark"><span class="left">Event Date</span><span class="right">'.$access_date.'</span></li>
+        <li class="light"><span class="left">Start Time - End Time</span><span class="right">'.$event_start_time.' - '.$event_end_time.'</span></li>
+        <li class="dark"><span class="left">Unlock Time - Lock Time</span><span class="right">'.$unlock_time.' - '.$lock_time.'</span></li>
+        <li class="light"><span class="left">Building Requested</span><span class="right">'.$building_record->building_name.'</span></li>
+        <li class="dark"><span class="left">Exterior Doors</span><span class="right">'.$request_details.'</span></li>
+        <li class="light"><span class="left">Interior Doors</span><span class="right">'.$interior_doors .'</span></li>
+        </ul>';
+        if(!empty($approval_comments)) {
+        $body .='
+    <div class="link"><p>Additional Remarks</p><p>'.$approval_comments.'</p></div>';
+  }
+    $body .='<div class="cancel"><p>To cancel a door request, please contact the Department of Public Safety directly: Operator (609) 258-3000</p></div>
+
+    </div>
+</div>
+
+<div class="copyright">&copy;2013 The Trustees of <a href="http://www.princeton.edu">Princeton University</a> &middot; Princeton, New Jersey 08544 USA</div>';
+      }
+      ptn_doors_custom_mail(NULL, $one_recipient, $subject, $body);
+    }
+
+  global $base_url;
+  // notify requester
+  $subject = 'Building Access Request Approved';
+  $body = '<style>
+*{box-sizing:border-box;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;}
+body {font-family:"Arial",Verdana;font-size:13px;line-height:18px;color:#5f5e5e;background:#f2f4f7;text-align:center;}
+body p {margin: 13px 0;}
+body a {color:#5f5e5e;text-decoration:none;}
+body ul, body li {margin:0;padding:0;list-style:none;}
+body .message {background:#fff;width:580px;margin:90px auto 30px auto;}
+body .message .header {display:table;width:100%;padding:12px;}
+body .message .header .header-image {float:left;padding: 0 0 10px;}
+body .message .alert {background:#ee7f2d;background:#ee7f2d;background-image:-webkit-linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  background-image:linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  -webkit-background-size:60px 60px;
+  background-size:60px 60px; height:64px;line-height:64px;text-align:center;color:#fff;font-size:22px;padding:0 10px;letter-spacing:1px;}
+  body .message .text {padding: 50px 40px 25px;font-weight: bold;}
+
+body .message .green {color:#00b611;}
+body .message .red {color:#e42615;}
+
+body .message .data {padding:0 40px;}
+body .message .data ul li.dark {background:#f2f4f7;height:37px;line-height:37px;padding:0 10px;}
+body .message .data ul li.light {background:#f8f9fa;height:37px;line-height:37px;padding:0 10px;}
+body .message .data ul li span.left {float:left;font-weight:bold;}
+body .message .data ul li span.right {float:right;}
+
+body .message .link {padding:0 0 50px;font-weight:bold;}
+body .message .cancel {padding:0 0 40px;font-weight:bold;}
+
+
+body .copyright {color:#8f8f8f;text-align:center;font-size:11px;padding: 0 0 50px 0;}
+</style>
+
+<div class="message">
+  <div class="header">
+      <div class="header-image"><a href="'.$base_url .'"><img src="'.$base_url.'/images/logo.png" width="224" height="65"/></a></div>
+    </div>
+    <div class="alert">
+      Building Access Request Notification
+    </div>
+  <div class="text">
+      <p>Your building request has been <span class="green">APPROVED</span> by the designated BAC administrator for these buildings. Below lists the requested building access</p>
+    </div>
+
+    <div class="data">
+      <ul>
+        <li class="dark"><span class="left">Event Date</span><span class="right">'.$access_date.'</span></li>
+        <li class="light"><span class="left">Start Time - End Time</span><span class="right">'.$event_start_time.' - '.$event_end_time.'</span></li>
+        <li class="dark"><span class="left">Unlock Time - Lock Time</span><span class="right">'.$unlock_time.' - '.$lock_time.'</span></li>
+        <li class="light"><span class="left">Building Requested</span><span class="right">'.$building_record->building_name.'</span></li>
+        <li class="dark"><span class="left">Exterior Doors</span><span class="right">'.$request_details.'</span></li>
+        <li class="light"><span class="left">Interior Doors</span><span class="right">'.$interior_doors .'</span></li>
+        </ul>';
+        if(!empty($approval_comments)) {
+        $body .='
+    <div class="link"><p>Additional Remarks</p><p>'.$approval_comments.'</p></div>';
+  }
+    $body .='<div class="cancel"><p>To cancel a door request, please contact the Department of Public Safety directly: Operator (609) 258-3000</p></div>
+
+    </div>
+</div>
+
+<div class="copyright">&copy;2013 The Trustees of <a href="http://www.princeton.edu">Princeton University</a> &middot; Princeton, New Jersey 08544 USA</div>';
+  ptn_doors_custom_mail(NULL, $requester_email, $subject, $body);
+
+  // notify DPS admin
+  //
+  //... need to confirm address/user ...
+
+  // continue to confirmation page
+  drupal_goto('door-request-approve-confirm');
+
+}
+
+
+/**
+ * For handling reset of a door request form
+ */
+function ptn_doors_reset_request_submit($form, &$form_state) {
+
+  /*
+  // authorized?
+  if(empty($_SESSION['phpCAS']['user'])) {
+    _ptn_doors_check_auth();
+    drupal_access_denied();
+  }
+  */
+
+  // read form params
+  $request_nid = $form_state['input']['request_nid'];
+  $approval_comments = t($form_state['input']['approval_comments']);
+
+  // load request node
+  $request_node = node_load($request_nid);
+  if(empty($request_node->nid) || 'door_request' != $request_node->type) {
+    echo "bad request id";
+    die;
+  }
+
+  $query = 'DELETE FROM ptn_building_approval_or_dissaproval WHERE bid = :bid';
+  db_query($query, array(':bid' => t($request_nid)));
+  header('Location: ' . $_SERVER['HTTP_REFERER']);
+}
+
+/**
+ * For handling deny of a door request form
+ */
+function ptn_doors_deny_request_submit($form, &$form_state) {
+
+  /*
+  // authorized?
+  if(empty($_SESSION['phpCAS']['user'])) {
+    _ptn_doors_check_auth();
+    drupal_access_denied();
+  }
+  */
+
+  // read form params
+  $request_nid = $form_state['input']['request_nid'];
+  $approval_comments = t($form_state['input']['approval_comments']);
+
+  // load request node
+  $request_node = node_load($request_nid);
+  if(empty($request_node->nid) || 'door_request' != $request_node->type) {
+    echo "bad request id";
+    die;
+  }
+    $approved = "2";
+    $query = 'INSERT INTO ptn_building_approval_or_dissaproval (bid, aord) ';
+  $query .= 'VALUES (:bid, :aord)';
+  db_query(
+    $query,
+    array(
+      ':bid' => t($request_nid),
+      ':aord' => t($approved),
+    )
+  );
+  $requester_email = $request_node->field_door_requester_email[LANGUAGE_NONE][0]['value'];
+  $access_date = $request_node->field_door_event_date[LANGUAGE_NONE][0]['value'];
+  $requester_comments = $request_node->body[LANGUAGE_NONE][0]['value'];
+  $requester_last_name = $request_node->field_door_requester_last_name[LANGUAGE_NONE][0]['value'];
+  $requester_first_name = $request_node->field_door_requester_first_name[LANGUAGE_NONE][0]['value'];
+  $requester_street_1 = $request_node->field_door_requester_street_1[LANGUAGE_NONE][0]['value'];
+  $requester_street_2 = $request_node->field_door_requester_street_2[LANGUAGE_NONE][0]['value'];
+  $requester_department = $request_node->field_door_requester_department[LANGUAGE_NONE][0]['value'];
+  $requester_phone_primary = $request_node->field_door_requester_phone_pri[LANGUAGE_NONE][0]['value'];
+  $requester_phone_emergency = $request_node->field_door_requester_phone_emer[LANGUAGE_NONE][0]['value'];
+  $requester_fax = $request_node->field_door_requester_fax[LANGUAGE_NONE][0]['value'];
+  $requester_email = $request_node->field_door_requester_email[LANGUAGE_NONE][0]['value'];
+  $requester_organization = $request_node->field_door_requester_org[LANGUAGE_NONE][0]['value'];
+  $requester_status = $request_node->field_door_requester_status[LANGUAGE_NONE][0]['value'];
+  $event_title = $request_node->field_door_event_title[LANGUAGE_NONE][0]['value'];
+  $event_date = $request_node->field_door_event_date[LANGUAGE_NONE][0]['value'];
+  $event_start_time = $request_node->field_door_event_start_time[LANGUAGE_NONE][0]['value'];
+  $event_end_time = $request_node->field_door_event_end_time[LANGUAGE_NONE][0]['value'];
+  $approved_reserved = $request_node->field_door_approved_reserved[LANGUAGE_NONE][0]['value'];
+  $approved_by = $request_node->field_door_approved_by[LANGUAGE_NONE][0]['value'];
+  $unlock_time = $request_node->field_door_unlock_time[LANGUAGE_NONE][0]['value'];
+  $lock_time = $request_node->field_door_lock_time[LANGUAGE_NONE][0]['value'];
+
+  // parse door request data
+  $door_data = $request_node->field_door_request_data[LANGUAGE_NONE][0]['value'];
+  $door_data_parts = explode('|', $door_data);
+  $building_id = $door_data_parts[0];
+  $exterior_doors = (count($door_data_parts) > 1) ? $door_data_parts[1] : '';
+  $interior_doors = (count($door_data_parts) == 3) ? $door_data_parts[2] : '';
+
+  // load building info
+  $building_record = NULL;
+  $result = db_query('SELECT * FROM ptn_buildings WHERE bid = :bid', array(':bid' => $building_id));
+  foreach ($result as $record) {
+    $building_record = $record;
+  }
+  if(empty($building_record->building_name)) {
+    echo "Could not read building info";
+    die;
+  }
+
+  // load door info
+  $exterior_door_records = array();
+  if(!empty($exterior_doors)) {
+    $result = db_query('SELECT * FROM ptn_building_doors WHERE did IN (' . t($exterior_doors) . ')');
+    foreach ($result as $record) {
+      array_push($exterior_door_records, $record);
+    }
+  }
+  // build request details text
+  $request_details = '';
+  foreach ($exterior_door_records as $one_exterior_door) {
+    $request_details .= $one_exterior_door->door_name . ',';
+  }
+  rtrim($request_details, ',');
+
+  // update request record
+  $request_node->field_door_request_status[LANGUAGE_NONE][0]['value'] = 'DENIED';
+  $request_node->field_door_approval_comments[LANGUAGE_NONE][0]['value'] = $approval_comments;
+  node_save($request_node);
+
+  // notify manual/electric
+  $elec_man_contact_list = NULL;
+  if('ELEC' == $building_record->elec_or_man) {
+    $elec_man_contact_list = variable_get('ptn_doors_contact_electric');
+  } elseif('MAN' == $building_record->elec_or_man) {
+    $elec_man_contact_list = variable_get('ptn_doors_contact_manual');
+  }
+
+  if(!empty($elec_man_contact_list)) {
+    $recipients = explode('|', $elec_man_contact_list);
+    global $base_url;
+    foreach($recipients as $one_recipient) {
+      $subject = 'Building Access Request Denied';
+        $body = '<style>
+*{box-sizing:border-box;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;}
+body {font-family:"Arial",Verdana;font-size:13px;line-height:18px;color:#5f5e5e;background:#f2f4f7;text-align:center;}
+body p {margin: 13px 0;}
+body a {color:#5f5e5e;text-decoration:none;}
+body ul, body li {margin:0;padding:0;list-style:none;}
+body .message {background:#fff;width:580px;margin:90px auto 30px auto;}
+body .message .header {display:table;width:100%;padding:12px;}
+body .message .header .header-image {float:left;padding: 0 0 10px;}
+body .message .alert {background:#ee7f2d;background:#ee7f2d;background-image:-webkit-linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  background-image:linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  -webkit-background-size:60px 60px;
+  background-size:60px 60px; height:64px;line-height:64px;text-align:center;color:#fff;font-size:22px;padding:0 10px;letter-spacing:1px;}
+  body .message .text {padding: 50px 40px 25px;font-weight: bold;}
+
+body .message .green {color:#00b611;}
+body .message .red {color:#e42615;}
+
+body .message .data {padding:0 40px;}
+body .message .data ul li.dark {background:#f2f4f7;height:37px;line-height:37px;padding:0 10px;}
+body .message .data ul li.light {background:#f8f9fa;height:37px;line-height:37px;padding:0 10px;}
+body .message .data ul li span.left {float:left;font-weight:bold;}
+body .message .data ul li span.right {float:right;}
+
+body .message .link {padding:0 0 50px;font-weight:bold;}
+body .message .cancel {padding:0 0 40px;font-weight:bold;}
+
+
+body .copyright {color:#8f8f8f;text-align:center;font-size:11px;padding: 0 0 50px 0;}
+</style>
+
+<div class="message">
+  <div class="header">
+      <div class="header-image"><a href="'.$base_url .'"><img src="'.$base_url.'/images/logo.png" width="224" height="65"/></a></div>
+    </div>
+    <div class="alert">
+      Building Access Request Notification
+    </div>
+  <div class="text">
+            <p>A request has been <span class="red">DECLINED</span> by the designated BAC administrator for these buildings. Below lists the requested building access</p>
+    </div>
+
+    <div class="data">
+      <ul>
+        <li class="dark"><span class="left">Event Date</span><span class="right">'.$access_date.'</span></li>
+        <li class="light"><span class="left">Start Time - End Time</span><span class="right">'.$event_start_time.' - '.$event_end_time.'</span></li>
+        <li class="dark"><span class="left">Unlock Time - Lock Time</span><span class="right">'.$unlock_time.' - '.$lock_time.'</span></li>
+        <li class="light"><span class="left">Building Requested</span><span class="right">'.$building_record->building_name.'</span></li>
+        <li class="dark"><span class="left">Exterior Doors</span><span class="right">'.$request_details.'</span></li>
+        <li class="light"><span class="left">Interior Doors</span><span class="right">'.$interior_doors .'</span></li>
+        </ul>';
+        if(!empty($approval_comments)) {
+        $body .='
+    <div class="link"><span class="red"><p>Additional Remarks</p><p>'.$approval_comments.'</p></span></div>';
+  }
+    $body .='<div class="cancel"><p>To cancel a door request, please contact the Department of Public Safety directly: Operator (609) 258-3000</p></div>
+
+    </div>
+</div>
+
+<div class="copyright">&copy;2013 The Trustees of <a href="http://www.princeton.edu">Princeton University</a> &middot; Princeton, New Jersey 08544 USA</div>';
+      }
+      ptn_doors_custom_mail(NULL, $one_recipient, $subject, $body);
+    }
+
+  global $base_url;
+  // notify requester
+  $subject = 'Building Access Request Denied';
+  $body = '<style>
+*{box-sizing:border-box;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;}
+body {font-family:"Arial",Verdana;font-size:13px;line-height:18px;color:#5f5e5e;background:#f2f4f7;text-align:center;}
+body p {margin: 13px 0;}
+body a {color:#5f5e5e;text-decoration:none;}
+body ul, body li {margin:0;padding:0;list-style:none;}
+body .message {background:#fff;width:580px;margin:90px auto 30px auto;}
+body .message .header {display:table;width:100%;padding:12px;}
+body .message .header .header-image {float:left;padding: 0 0 10px;}
+body .message .alert {background:#ee7f2d;background:#ee7f2d;background-image:-webkit-linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  background-image:linear-gradient(-45deg, rgba(241,149,81, 0.5) 25%, transparent 25%, transparent 50%, rgba(241,149,81, 0.5) 50%, rgba(241,149,81, 0.5) 75%, transparent 75%, transparent);
+  -webkit-background-size:60px 60px;
+  background-size:60px 60px; height:64px;line-height:64px;text-align:center;color:#fff;font-size:22px;padding:0 10px;letter-spacing:1px;}
+  body .message .text {padding: 50px 40px 25px;font-weight: bold;}
+
+body .message .green {color:#00b611;}
+body .message .red {color:#e42615;}
+
+body .message .data {padding:0 40px;}
+body .message .data ul li.dark {background:#f2f4f7;height:37px;line-height:37px;padding:0 10px;}
+body .message .data ul li.light {background:#f8f9fa;height:37px;line-height:37px;padding:0 10px;}
+body .message .data ul li span.left {float:left;font-weight:bold;}
+body .message .data ul li span.right {float:right;}
+
+body .message .link {padding:0 0 50px;font-weight:bold;}
+body .message .cancel {padding:0 0 40px;font-weight:bold;}
+
+
+body .copyright {color:#8f8f8f;text-align:center;font-size:11px;padding: 0 0 50px 0;}
+</style>
+
+<div class="message">
+  <div class="header">
+      <div class="header-image"><a href="'.$base_url .'"><img src="'.$base_url.'/images/logo.png" width="224" height="65"/></a></div>
+    </div>
+    <div class="alert">
+      Building Access Request Notification
+    </div>
+  <div class="text">
+      <p>Your request has been <span class="red">DECLINED</span> by the designated BAC administrator for these buildings. Below lists the requested building access</p>
+    </div>
+
+    <div class="data">
+      <ul>
+        <li class="dark"><span class="left">Event Date</span><span class="right">'.$access_date.'</span></li>
+        <li class="light"><span class="left">Start Time - End Time</span><span class="right">'.$event_start_time.' - '.$event_end_time.'</span></li>
+        <li class="dark"><span class="left">Unlock Time - Lock Time</span><span class="right">'.$unlock_time.' - '.$lock_time.'</span></li>
+        <li class="light"><span class="left">Building Requested</span><span class="right">'.$building_record->building_name.'</span></li>
+        <li class="dark"><span class="left">Exterior Doors</span><span class="right">'.$request_details.'</span></li>
+        <li class="light"><span class="left">Interior Doors</span><span class="right">'.$interior_doors .'</span></li>
+        </ul>';
+        if(!empty($approval_comments)) {
+        $body .='
+    <div class="link"><span class="red"><p>Additional Remarks</p><p>'.$approval_comments.'</p></span></div>';
+  }
+    $body .='<div class="cancel"><p>To cancel a door request, please contact the Department of Public Safety directly: Operator (609) 258-3000</p></div>
+
+    </div>
+</div>
+
+<div class="copyright">&copy;2013 The Trustees of <a href="http://www.princeton.edu">Princeton University</a> &middot; Princeton, New Jersey 08544 USA</div>';
+  ptn_doors_custom_mail(NULL, $requester_email, $subject, $body);
+
+  // notify DPS admin
+  //
+  //... need to confirm address/user ...
+
+  // continue to confirmation page
+  drupal_goto('door-request-deny-confirm');
+
+}
+
+/**
+ * For verifying that user is authorized (logged in to CAS)
+ */
+function _ptn_doors_check_auth() {
+
+  // function params
+  $use_cas = TRUE;
+  $is_authenticated = FALSE;
+
+  // require CAS authentication
+  if($use_cas) {
+
+    // inclue libs
+    include_once('sites/all/libraries/CAS/CAS.php');
+
+    // configure CASlist
+    phpCAS::setDebug();
+    phpCAS::client(CAS_VERSION_2_0,'fed.princeton.edu',443,'cas');
+    phpCAS::setNoCasServerValidation();
+
+    // check user auth status
+    //$is_authenticated = phpCAS::isAuthenticated();
+    $is_authenticated = phpCAS::forceAuthentication();
+
+  // open access
+  } else {
+    $is_authenticated = TRUE;
+  }
+
+  // return result
+  return $is_authenticated;
+
+}

@@ -1,0 +1,38 @@
+<section class="row hero relative header-images" >
+   <div class="image-header">
+        <img src="http://sdsdev.co/PTN8/downloads/1.jpg">
+   </div>
+    <div class="block absolute info z-2">
+        <div class="row max-height">
+            <div class="col mid">
+                <div class="call"><a href="tel:1-609-258-3333">Call PSAFE!</a></div>
+
+                <div class="row box">
+                    <div class="row nav relative">{{ page.nav_box }}</div>
+                    <div class="row social">
+                        <ul>
+                            <li><a target="_blank" href="https://www.facebook.com/pudps"><i class="icon-facebook"></i></a></li>
+                            <li><a target="_blank" href="http://publicsafety.princeton.edu/news-feed"><i class="icon-rss"></i></a></li>
+                        </ul>
+                    </div>
+                </div><!-- row.box -->
+            </div><!-- col.mid -->
+        </div><!-- row.max-height -->
+    </div><!-- block.absolute.info.z-2 -->
+</section>
+
+<section class="row boxes">
+    <div class="row content">
+        <div class="prime front-content">
+            <div class="row a">{{ page.homepage_boxes }}</div>
+        </div>
+        <div class="aside aside-front">
+            <div class="box">
+                <div class="heading"><h4>Recent News</h4></div>
+                <div class="data">{{ page.homepage_recent_news }}</div>
+                <div class="click"><a class="button" href="http://publicsafety.princeton.edu/news">View All News</a></div>
+            </div><!-- row.box -->
+        </div><!-- col.aside -->
+    </div><!-- row.content -->
+</section>
+<div class="row entry">{{ page.content }}</div>

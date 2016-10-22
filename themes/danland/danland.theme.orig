@@ -1,0 +1,359 @@
+<?php
+
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Component\Utility\Xss;
+use Drupal\Core\Template\Attribute;
+use Drupal\Core\Url;
+use Drupal\Core\Render\Element;
+/**
+ * Implements hook_theme_suggestions_HOOK_alter().
+ */
+
+
+
+/**
+ * Implements template_preprocess_html().
+ */
+function danland_preprocess_html(&$variables) {
+
+    if (!empty($variables['page']['sidebar_first']) && !empty($variables['page']['sidebar_second'])) {
+        $variables['attributes']['class'][] = 'two-sidebars';
+    }
+    elseif (!empty($variables['page']['sidebar_first']) || !empty($variables['page']['sidebar_second'])) {
+        $variables['attributes']['class'][] = 'one-sidebar';
+    }
+    else {
+        $variables['attributes']['class'][] = 'no-sidebars';
+    }
+
+    if (!empty($variables['page']['sidebar_first']) && empty($variables['page']['sidebar_second'])) {
+        $variables['attributes']['class'][] = 'one-sidebar-left';
+    }
+    elseif (empty($variables['page']['sidebar_first']) && !empty($variables['page']['sidebar_second'])) {
+        $variables['attributes']['class'][] = 'one-sidebar-right';
+    }
+
+  $block = \Drupal\block\Entity\Block::load('searchform');
+  $block_content = \Drupal::entityManager()
+          ->getViewBuilder('block')
+          ->view($block);
+  //print drupal_render($block_content);
+  $variables['search_form_block'] = drupal_render($block_content);
+
+}
+
+/**
+ * Implements template_preprocess_page().
+ */
+function danland_preprocess_page(&$variables) {
+
+    $variables['danland_layout'] = new Attribute;
+    $variables['danland_layout']['id'] = array();
+
+    if (!empty($variables['page']['sidebar_first']) && !empty($variables['page']['sidebar_second'])) {
+        $variables['danland_layout']['id'][] = 'layout-type-2';
+    }
+    elseif (!empty($variables['page']['sidebar_first']) || !empty($variables['page']['sidebar_second'])) {
+        $variables['danland_layout']['id'][] = 'layout-type-1';
+    }
+    $mask = '/\.(?:jp[e]?g|gif|png)$/i';
+    $files = file_scan_directory(drupal_get_path('theme', 'danland') . '/images/slideshows', $mask);
+    ksort($files);
+    $variables['files'] = $files;
+
+  global $base_url;
+  $link = $base_url;
+    //$variables['theme'] = '' .$base_url. '/' . drupal_get_path('theme','danland') . '';
+    $variables['theme'] = '/PTN8/themes/danland';
+    $variables['site_url'] = '' .$base_url. '/';
+   //  dpm($variables);
+    if(isset($variables['node']->field_cover_image->entity)) {
+        $image = file_create_url($variables['node']->field_cover_image->entity->getFileUri());
+        $variables['cover_image'] = $image;
+    }
+
+
+
+  if ($node = \Drupal::routeMatch()->getParameter('node')) {
+    $variables['title'] = $node->title->value;
+  }
+  if (strpos(\Drupal::service('path.current')->getPath(), 'video-gallery')) {
+    $variables['title'] = 'Princeton Public Safety Videos';
+  }
+}
+
+/**
+ * Implements template_preprocess_block().
+ */
+function danland_preprocess_block(&$variables) {
+
+    $variables['attributes']['class'][] = 'block';
+    $variables['title_attributes']['class'][] = 'block-title';
+}
+
+
+
+
+
+function danland_preprocess_breadcrumb(&$variables) {
+  global $base_url;
+
+  $request = \Drupal::request();
+  $route_match = \Drupal::routeMatch();
+  $current_path = \Drupal::service('path.current')->getPath();
+  $result_url = \Drupal::service('path.alias_manager')->getAliasByPath($current_path);
+  $result_url = $base_url.$result_url;
+
+  $page_title = \Drupal::service('title_resolver')->getTitle($request, $route_match->getRouteObject());
+
+  $node = \Drupal::routeMatch()->getParameter('node');
+
+
+  if($node){
+      if(isset($variables['breadcrumb'][1])){
+        if ($variables['breadcrumb'][1]['text'] == 'Node' || $variables['breadcrumb'][1]['text'] == 'node') {
+          unset($variables['breadcrumb'][1]);
+        }
+      }
+
+    if($node->bundle() == 'page'){
+      $website_secction = $node->get('field_website_section')->getValue();
+      if(isset($website_secction[0])){
+        switch ($website_secction[0]['target_id']) {
+          case 1:
+            $variables['breadcrumb'][] = array(
+              'text' => 'About',
+              'url'=> 'about'
+            );
+            break;
+          case 2:
+            $variables['breadcrumb'][] = array(
+              'text' => 'Clery',
+              'url'=> 'clery'
+            );
+            break;
+          case 3:
+            $variables['breadcrumb'][] = array(
+              'text' => 'Contact',
+              'url'=> 'contact'
+            );
+            break;
+          case 4:
+            $variables['breadcrumb'][] = array(
+              'text' => 'Emergency Preparedness',
+              'url'=> 'emergency-preparedness'
+            );
+            break;
+          case 5:
+            if ($variables['breadcrumb'][1]['text'] == 'Forms' ||
+              $variables['breadcrumb'][1]['text'] == 'forms') {
+              $variables['breadcrumb'][1]['url'] = '/contact';
+            }
+            break;
+          case 6:
+            $variables['breadcrumb'][] = array(
+              'text' => 'News',
+              'url'=> 'news'
+            );
+            break;
+          case 7:
+            $variables['breadcrumb'][] = array(
+              'text' => 'Safety & Security',
+              'url'=> 'safety-security'
+            );
+            break;
+          case 8:
+            $variables['page_title'][] = array(
+              'text' => 'Staff Directory',
+              'url'=> 'directory'
+            );
+            break;
+
+      }
+
+      }
+
+      $variables['breadcrumb'][] = array(
+            'text' => $page_title,
+            'url'=> $result_url
+      );
+
+    }elseif ($node->bundle() == 'gallery') {
+      /*$variables['breadcrumb'][] = array(
+        'text' => 'Gallery',
+        'url'=> $result_url
+      );
+
+      $variables['breadcrumb'][] = array(
+        'text' => $page_title,
+        'url'=> 'gallery'
+      );*/
+    }
+
+elseif ($node->bundle() == 'news_ticker') {
+        $variables['breadcrumb'][] = array(
+            'text' => 'News',
+            'url'=> 'news'
+        );
+    }elseif ($node->bundle() == 'article') {
+
+        $variables['breadcrumb'][] = array(
+            'text' => 'News',
+            'url'=> 'news'
+        );
+
+        $variables['breadcrumb'][] = array(
+            'text' => $page_title,
+            'url'=> $result_url
+        );
+
+
+    }else{
+      $variables['breadcrumb'][] = array(
+        'text' => $page_title,
+        'url'=> $result_url
+      );
+    }
+  }elseif(strpos(\Drupal::service('path.current')->getPath(), 'video-gallery')){
+      $variables['breadcrumb'][] = array(
+        'text' => 'Videos',
+        'url'=> $result_url
+      );
+  }else{
+      $variables['breadcrumb'][] = array(
+        'text' => $page_title,
+        'url'=> $result_url
+      );
+  }
+
+
+}
+
+
+function danland_preprocess_node(&$variables){
+  $node = $variables['elements']['#node'];
+
+  if($node){
+    if($node->bundle() == 'page' && $node->id() == 467){
+      $output_data = '';
+      $all_html = $all_warning = $all_wether = $all_accident = '';
+
+        if(isset($_REQUEST['btnSubmit'])) {
+          $date = $_REQUEST['date'];
+          if ($date) {
+              $all_warning=$all_accident=$all_wether=$all_html='<table width="100%" border="0" cellpadding="0" cellspacing="0">';
+              $date = '%'.date('Y-m-d', strtotime($date)).'%';
+
+              $result = \Drupal::service('database')->query('SELECT n.nid FROM {node} n
+              INNER JOIN {node__field_last_update} fd ON n.nid = fd.entity_id
+              WHERE type = :type AND fd.field_last_update_value  LIKE :date_value
+              ORDER BY fd.field_last_update_value DESC',
+              array(':type' => 'alert',':date_value' => $date ))->fetchAll();
+
+              $all_html = $all_warning = $all_wether = $all_accident;
+
+              foreach ($result as $record) {
+                $node = \Drupal::entityManager()->getStorage('node')->load($record->nid);
+                $alert_type = $node->get('field_field_alert_type')->getValue();
+                $alert_type = $alert_type[0]['value'];
+
+                $path = '/node/' . $node->id();
+                $path = \Drupal::service('path.alias_manager')->getAliasByPath($path);
+
+                $date = $node->get('field_last_update')->getValue();
+
+                $alert_date = date('m/d/Y', strtotime($date[0]['value']));
+
+                $type_value = "<span class='" . $alert_type . "'></span>";
+
+                $title = $node->get('title')->value;
+
+                $all_html .= '<tr><td style="width:10%">' . $type_value . '</td>
+                              <td style="width:25%"><a href="'.$path.'">'.$alert_date.'</a></td>
+                              <td><a href="'.$path.'">'.$title.'</a></td></tr>';
+
+                  if($alert_type == 'Warning') {
+                    $all_warning .= '<tr><td style="width:10%">' . $type_value . '</td>
+                    <td style="width:25%"><a href="'.$path.'">'.$alert_date.'</a></td>
+                              <td><a href="'.$path.'">'.$title.'</a></td></tr>';
+                  }elseif ($alert_type == 'Weather') {
+                    $all_wether .= '<tr><td style="width:10%">' . $type_value . '</td>
+                    <td style="width:25%"><a href="'.$path.'">'.$alert_date.'</a></td>
+                              <td><a href="'.$path.'">'.$title.'</a></td></tr>';
+                  }
+                  elseif($alert_type == 'Accident') {
+                    $all_accident .= '<tr><td style="width:10%">' . $type_value . '</td>
+                    <td style="width:25%"><a href="'.$path.'">'.$alert_date.'</a></td>
+                              <td><a href="'.$path.'">'.$title.'</a></td></tr>';
+                  }
+              }
+
+              $output_data .= '<div title="work" id="work1" style="display:block"><table>'. $all_html.'</table></div>';
+              $output_data .= '<div  title="work" id="work2" style="display:none"><table>'.$all_warning.'</table></div>';
+              $output_data .= '<div  title="work" id="work3" style="display:none;"><table>'.$all_wether.'</table></div>';
+              $output_data .= '<div  title="work" id="work4" style="display:none"><table>'.$all_accident.'</table></div>';
+          }
+
+        }else{
+
+
+            $result = \Drupal::service('database')->query('SELECT n.nid FROM {node} n
+              INNER JOIN {node__field_last_update} fd ON n.nid = fd.entity_id
+              WHERE type = :type ORDER BY fd.field_last_update_value DESC',
+              array(':type' => 'alert'))->fetchAll();
+
+            $all_html = $all_warning = $all_wether = $all_accident;
+
+            foreach ($result as $record) {
+              $node = \Drupal::entityManager()->getStorage('node')->load($record->nid);
+              $alert_type = $node->get('field_field_alert_type')->getValue();
+              if (isset($alert_type[0])){
+              $alert_type = $alert_type[0]['value'];
+
+              $path = '/node/' . $node->id();
+              $path = \Drupal::service('path.alias_manager')->getAliasByPath($path);
+
+              $date = $node->get('field_last_update')->getValue();
+
+              $alert_date = date('m/d/Y', strtotime($date[0]['value']));
+
+              $type_value = "<span class='" . $alert_type . "'></span>";
+
+              $title = $node->get('title')->value;
+
+              $all_html .= '<tr><td style="width:10%">' . $type_value . '</td>
+                            <td style="width:25%"><a href="'.$path.'">'.$alert_date.'</a></td>
+                            <td><a href="'.$path.'">'.$title.'</a></td></tr>';
+
+                if($alert_type == 'Warning') {
+                  $all_warning .= '<tr><td style="width:10%">' . $type_value . '</td>
+                  <td style="width:25%"><a href="'.$path.'">'.$alert_date.'</a></td>
+                            <td><a href="'.$path.'">'.$title.'</a></td></tr>';
+                }elseif ($alert_type == 'Weather') {
+                  $all_wether .= '<tr><td style="width:10%">' . $type_value . '</td>
+                  <td style="width:25%"><a href="'.$path.'">'.$alert_date.'</a></td>
+                            <td><a href="'.$path.'">'.$title.'</a></td></tr>';
+                }
+                elseif($alert_type == 'Accident') {
+                  $all_accident .= '<tr><td style="width:10%">' . $type_value . '</td>
+                  <td style="width:25%"><a href="'.$path.'">'.$alert_date.'</a></td>
+                            <td><a href="'.$path.'">'.$title.'</a></td></tr>';
+                }
+              }  
+            }
+
+            $output_data .= '<div title="work" id="work1" style="display:block"><table>'. $all_html.'</table></div>';
+            $output_data .= '<div  title="work" id="work2" style="display:none"><table>'.$all_warning.'</table></div>';
+            $output_data .= '<div  title="work" id="work3" style="display:none;"><table>'.$all_wether.'</table></div>';
+            $output_data .= '<div  title="work" id="work4" style="display:none"><table>'.$all_accident.'</table></div>';
+        }
+
+      $variables['node_page_form_alert_warnings'] = $output_data;
+    }
+  }
+
+
+}
+
+  
+ 

@@ -1,0 +1,12 @@
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa
+{% for row in rows %}
+<article class="row">
+	<div class="col image">{row.field_image}<!--<img class="img-block" src="http://publicsafety.princeton.edu/downloads/styles/blog_thubmnail/public/IMG_3994.JPG">--></div>
+	<div class="col info">
+		<div class="row title"><h3>{row.title}</h3></div>
+		<div class="row meta">Date</div>
+		<div class="row excerpt">{row.body}</div>
+		<div class="row click"><a class="button" href="node/{row.nid}">Read More</a></div>
+	</div>
+</article>
+{% endfor %}

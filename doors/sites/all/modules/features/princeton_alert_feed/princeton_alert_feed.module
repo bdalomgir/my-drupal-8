@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Princeton Alert Feed feature.
+ */
+
+include_once 'princeton_alert_feed.features.inc';

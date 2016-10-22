@@ -1,0 +1,40 @@
+name: theme
+type: theme
+base theme: classy
+description: theme theme
+# core: 8.x
+regions:
+  facebook_likes: Facebook Likes
+  popular_posts: Popular Posts
+  crime_definitions: Crime Definitions
+  additional_resources: Additional Resources
+  sidebar_menu: Sidebar Menu
+  sidebar_menu_video: Sidebar Menu Video
+  homepage_recent_news: Homepage Recent News
+  homepage_boxes: Homepage Boxes
+  nav_box: Nav Box
+  nav_mobile: Nav Mobile
+  nav_small: Nav Small
+  nav_medium: Nav Medium
+  alert_major: Alert Major
+  alert_minor: Alert Minor
+  ptn_main: PTN Main
+  phone_numbers: Phone Numbers
+  gallery: Gallery
+  footer_1: Footer 1
+  footer_2: Footer 2
+  footer_3: Footer 3
+  footer_4: Footer 4
+  footer_5: Footer 5
+  search_box: Search region
+  slideshow: 'Slideshow'
+  breadcrumb: Breadcrumb
+  content: Main content
+screenshot: screenshot.png
+libraries:
+  - theme/global
+# Information added by Drupal.org packaging script on 2016-01-29
+version: '8.x-1.0'
+core: '8.x'
+project: 'theme'
+datestamp: 1454052240
