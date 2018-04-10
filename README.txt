@@ -12,6 +12,7 @@ CONTENTS OF THIS FILE
 ABOUT DRUPAL
 ------------
 
+
 Drupal is an open source content management platform supporting a variety of
 websites ranging from personal weblogs to large community-driven websites. For
 more information, see the Drupal website at https://www.drupal.org, and join
